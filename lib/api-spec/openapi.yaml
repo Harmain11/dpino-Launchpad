@@ -1,15 +1,20 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: DPINO Launchpad API specification
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: projects
+    description: Launchpad project operations
+  - name: staking
+    description: Staking operations
+  - name: stats
+    description: Platform statistics
 paths:
   /healthz:
     get:
@@ -24,6 +29,147 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List all launchpad projects
+      description: Returns all projects on the launchpad
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [upcoming, live, ended, all]
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Submit a project for listing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectBody"
+      responses:
+        "201":
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+  /projects/{id}:
+    get:
+      operationId: getProject
+      tags: [projects]
+      summary: Get a single project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Project details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Project not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /staking/tiers:
+    get:
+      operationId: getStakingTiers
+      tags: [staking]
+      summary: Get all staking tiers
+      responses:
+        "200":
+          description: List of staking tiers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StakingTier"
+  /staking/positions:
+    get:
+      operationId: listStakingPositions
+      tags: [staking]
+      summary: Get staking positions
+      parameters:
+        - name: walletAddress
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of staking positions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StakingPosition"
+    post:
+      operationId: createStakingPosition
+      tags: [staking]
+      summary: Stake $DPINO
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStakingPositionBody"
+      responses:
+        "201":
+          description: Staking position created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StakingPosition"
+  /stats/platform:
+    get:
+      operationId: getPlatformStats
+      tags: [stats]
+      summary: Get platform-wide statistics
+      responses:
+        "200":
+          description: Platform statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlatformStats"
+  /stats/projects/featured:
+    get:
+      operationId: getFeaturedProjects
+      tags: [stats]
+      summary: Get featured/trending projects
+      responses:
+        "200":
+          description: Featured projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+
 components:
   schemas:
     HealthStatus:
@@ -33,4 +179,197 @@ components:
           type: string
       required:
         - status
-
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        ticker:
+          type: string
+        description:
+          type: string
+        logoUrl:
+          type: string
+        bannerUrl:
+          type: string
+        tokenAddress:
+          type: string
+        status:
+          type: string
+          enum: [upcoming, live, ended]
+        totalRaise:
+          type: number
+        raisedAmount:
+          type: number
+        tokenPrice:
+          type: number
+        minAllocation:
+          type: number
+        maxAllocation:
+          type: number
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        websiteUrl:
+          type: string
+        twitterUrl:
+          type: string
+        telegramUrl:
+          type: string
+        participants:
+          type: integer
+        category:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - ticker
+        - description
+        - status
+        - totalRaise
+        - raisedAmount
+        - tokenPrice
+        - startDate
+        - endDate
+        - participants
+        - category
+        - createdAt
+    CreateProjectBody:
+      type: object
+      properties:
+        name:
+          type: string
+        ticker:
+          type: string
+        description:
+          type: string
+        tokenAddress:
+          type: string
+        totalRaise:
+          type: number
+        tokenPrice:
+          type: number
+        minAllocation:
+          type: number
+        maxAllocation:
+          type: number
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        websiteUrl:
+          type: string
+        twitterUrl:
+          type: string
+        telegramUrl:
+          type: string
+        category:
+          type: string
+      required:
+        - name
+        - ticker
+        - description
+        - totalRaise
+        - tokenPrice
+        - startDate
+        - endDate
+        - category
+    StakingTier:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        requiredAmount:
+          type: number
+        allocationMultiplier:
+          type: number
+        benefits:
+          type: array
+          items:
+            type: string
+        color:
+          type: string
+      required:
+        - id
+        - name
+        - requiredAmount
+        - allocationMultiplier
+        - benefits
+        - color
+    StakingPosition:
+      type: object
+      properties:
+        id:
+          type: string
+        walletAddress:
+          type: string
+        amountStaked:
+          type: number
+        tier:
+          type: string
+        rewardsEarned:
+          type: number
+        stakedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - walletAddress
+        - amountStaked
+        - tier
+        - rewardsEarned
+        - stakedAt
+    CreateStakingPositionBody:
+      type: object
+      properties:
+        walletAddress:
+          type: string
+        amountStaked:
+          type: number
+      required:
+        - walletAddress
+        - amountStaked
+    PlatformStats:
+      type: object
+      properties:
+        totalProjectsLaunched:
+          type: integer
+        totalRaisedUsd:
+          type: number
+        totalStakers:
+          type: integer
+        totalDpinoStaked:
+          type: number
+        activeLaunches:
+          type: integer
+        successRate:
+          type: number
+      required:
+        - totalProjectsLaunched
+        - totalRaisedUsd
+        - totalStakers
+        - totalDpinoStaked
+        - activeLaunches
+        - successRate
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+      required:
+        - error
+        - message

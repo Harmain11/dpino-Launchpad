@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "DPINO Launchpad"
+version = "1.0.0"
+id = "artifacts/dpino-launchpad"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19874
+
+[services.development]
+run = "pnpm --filter @workspace/dpino-launchpad run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/dpino-launchpad", "run", "build" ]
+publicDir = "artifacts/dpino-launchpad/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19874"
+BASE_PATH = "/"

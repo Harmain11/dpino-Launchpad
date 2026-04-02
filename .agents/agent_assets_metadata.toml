@@ -1,0 +1,20 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "W1OjiTq7ihS333W8wYzZz"
+uri = "file://artifacts/dpino-launchpad/public/images/hero-bg.png"
+type = "image"
+title = "Dark cinematic crypto background"
+
+[[generated]]
+id = "N5HW_3vhnAN1AN-HT9WXu"
+uri = "file://artifacts/dpino-launchpad/public/images/project-1.png"
+type = "image"
+title = "Dark gold crypto banner"
+
+[[generated]]
+id = "hlJX9qxrfH2tX5JpqA5Ph"
+uri = "file://artifacts/dpino-launchpad/public/images/project-2.png"
+type = "image"
+title = "Neon violet crypto banner"
