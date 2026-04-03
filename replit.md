@@ -19,6 +19,15 @@ Built as a pnpm workspace monorepo using TypeScript.
 ### API Field
 `totalRaisedDpino` (renamed from `totalRaisedUsd`) in `/api/stats/platform` response
 
+### Authentication (Clerk)
+Clerk auth is fully integrated. Routes: `/sign-in`, `/sign-up`.
+- Registration with email + password or Google OAuth
+- Email verification sent automatically on sign-up
+- Forgot password built into sign-in flow
+- Navbar shows "SIGN IN" + "REGISTER" when signed out; user email + "Sign Out" when signed in
+- Env secrets: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`
+- API: `@clerk/express` middleware on server; `@clerk/react` on client
+
 ### Smart Contract Review (Anchor)
 Both contracts are logically correct and ready for local compilation:
 

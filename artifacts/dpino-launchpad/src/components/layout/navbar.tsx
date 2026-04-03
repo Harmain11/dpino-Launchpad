@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Menu, X, ChevronDown, Copy, LogOut, Wallet } from "lucide-react";
+import { Menu, X, ChevronDown, Copy, LogOut, Wallet, User } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useDpinoBalance } from "@/hooks/useDpinoBalance";
 import { useDpinoPrice } from "@/hooks/useDpinoPrice";
+import { useUser, useClerk } from "@clerk/react";
 
 function shortenAddress(addr: string) {
   return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
@@ -37,11 +38,14 @@ export function Navbar() {
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [authMenuOpen, setAuthMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const { select, wallets, publicKey, connected, disconnect, connecting } = useWallet();
   const { data: balance } = useDpinoBalance();
   const { data: priceData } = useDpinoPrice();
+  const { user, isLoaded: isUserLoaded } = useUser();
+  const { signOut } = useClerk();
 
   const address = publicKey?.toBase58() ?? "";
 
@@ -131,6 +135,65 @@ export function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-3">
+            {/* Auth State */}
+            {isUserLoaded && (
+              user ? (
+                <div className="relative">
+                  <button
+                    onClick={() => setAuthMenuOpen(!authMenuOpen)}
+                    className="flex items-center gap-2 bg-white/5 border border-white/10 hover:border-primary/30 rounded-sm px-3 py-2 transition-all"
+                  >
+                    {user.imageUrl ? (
+                      <img src={user.imageUrl} alt="" className="w-5 h-5 rounded-full" />
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+                        <User size={12} className="text-primary" />
+                      </div>
+                    )}
+                    <span className="text-sm text-foreground max-w-[120px] truncate">
+                      {user.primaryEmailAddress?.emailAddress?.split("@")[0] ?? "Account"}
+                    </span>
+                    <ChevronDown size={12} className={`text-muted-foreground transition-transform ${authMenuOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {authMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setAuthMenuOpen(false)} />
+                      <div className="absolute right-0 top-full mt-2 w-60 bg-card border border-white/10 rounded-sm shadow-xl z-50 overflow-hidden">
+                        <div className="p-4 border-b border-white/10">
+                          <p className="text-xs text-muted-foreground uppercase tracking-widest mb-0.5">Signed in as</p>
+                          <p className="text-sm text-foreground font-medium truncate">{user.primaryEmailAddress?.emailAddress}</p>
+                        </div>
+                        <div className="p-2">
+                          <button
+                            onClick={() => { signOut(); setAuthMenuOpen(false); }}
+                            className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-400/10 rounded-sm transition-colors"
+                          >
+                            <LogOut size={14} />
+                            Sign Out
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/sign-in"
+                    className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors uppercase tracking-wide"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/sign-up"
+                    className="text-sm font-bold text-black bg-primary hover:bg-primary/90 px-3 py-1.5 rounded-sm uppercase tracking-wide transition-colors shadow-[0_0_10px_rgba(245,158,11,0.2)]"
+                  >
+                    Register
+                  </Link>
+                </div>
+              )
+            )}
+
             {connected && publicKey ? (
               <div className="relative">
                 <button
@@ -238,6 +301,48 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
+
+            {/* Auth row */}
+            {isUserLoaded && (
+              user ? (
+                <div className="flex items-center justify-between p-2 border border-white/10 rounded-sm">
+                  <div className="flex items-center gap-2">
+                    {user.imageUrl ? (
+                      <img src={user.imageUrl} alt="" className="w-5 h-5 rounded-full" />
+                    ) : (
+                      <User size={14} className="text-primary" />
+                    )}
+                    <span className="text-sm text-foreground truncate max-w-[160px]">
+                      {user.primaryEmailAddress?.emailAddress}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => { signOut(); setMobileMenuOpen(false); }}
+                    className="text-xs text-red-400 flex items-center gap-1"
+                  >
+                    <LogOut size={12} /> Sign Out
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Link
+                    href="/sign-in"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex-1 text-center py-2 text-sm font-medium text-muted-foreground border border-white/10 hover:border-primary/30 rounded-sm uppercase tracking-wide"
+                  >
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/sign-up"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex-1 text-center py-2 text-sm font-bold text-black bg-primary hover:bg-primary/90 rounded-sm uppercase tracking-wide"
+                  >
+                    Register
+                  </Link>
+                </div>
+              )
+            )}
+
             {connected && publicKey ? (
               <div className="flex items-center gap-2 p-2 border border-white/10 rounded-sm">
                 <div className="w-2 h-2 rounded-full bg-green-400" />
