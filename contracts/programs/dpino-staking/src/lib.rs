@@ -14,10 +14,20 @@ pub const SOLDIER_THRESHOLD:   u64 = 100_000_000_000_000;   // 100K  DPINO (9 de
 pub const GENERAL_THRESHOLD:   u64 = 500_000_000_000_000;   // 500K  DPINO
 pub const DARK_LORD_THRESHOLD: u64 = 1_000_000_000_000_000; // 1M    DPINO
 
-/// Default tier APYs in basis points (1 bps = 0.01%)
-pub const SOLDIER_APY_BPS:   u64 = 1_200; // 12%
-pub const GENERAL_APY_BPS:   u64 = 1_800; // 18%
-pub const DARK_LORD_APY_BPS: u64 = 2_400; // 24%
+/// Flexible staking APYs (can withdraw after 7-day cooldown)
+pub const SOLDIER_FLEX_APY_BPS:   u64 = 1_200; // 12%
+pub const GENERAL_FLEX_APY_BPS:   u64 = 1_800; // 18%
+pub const DARK_LORD_FLEX_APY_BPS: u64 = 2_400; // 24%
+
+/// Fixed 30-day staking APYs (tokens locked for 30 days, higher reward)
+pub const SOLDIER_FIXED30_APY_BPS:   u64 = 2_000; // 20%
+pub const GENERAL_FIXED30_APY_BPS:   u64 = 2_800; // 28%
+pub const DARK_LORD_FIXED30_APY_BPS: u64 = 3_600; // 36%
+
+/// Fixed 90-day staking APYs (tokens locked for 90 days, highest reward)
+pub const SOLDIER_FIXED90_APY_BPS:   u64 = 3_000; // 30%
+pub const GENERAL_FIXED90_APY_BPS:   u64 = 4_200; // 42%
+pub const DARK_LORD_FIXED90_APY_BPS: u64 = 5_400; // 54%
 
 pub const DEFAULT_COOLDOWN_SECONDS: i64 = 7 * 24 * 60 * 60;
 pub const RATE_DENOMINATOR:         u64 = 10_000;
@@ -34,29 +44,36 @@ pub mod dpino_staking {
     // ─── Admin ───────────────────────────────────────────────────────────────
 
     /// Initialize the global staking pool (admin only, called once).
-    /// Uses default tier APYs: SOLDIER 12%, GENERAL 18%, DARK_LORD 24%.
     pub fn initialize_pool(
         ctx: Context<InitializePool>,
         cooldown_seconds: i64,
     ) -> Result<()> {
         let pool = &mut ctx.accounts.staking_pool;
-        pool.authority             = ctx.accounts.authority.key();
-        pool.dpino_mint            = ctx.accounts.dpino_mint.key();
-        pool.vault                 = ctx.accounts.vault.key();
-        pool.reward_vault          = ctx.accounts.reward_vault.key();
-        pool.total_staked          = 0;
-        pool.soldier_apy_bps       = SOLDIER_APY_BPS;
-        pool.general_apy_bps       = GENERAL_APY_BPS;
-        pool.dark_lord_apy_bps     = DARK_LORD_APY_BPS;
-        pool.sol_reward_lamports   = 0;
-        pool.cooldown_seconds      = if cooldown_seconds > 0 { cooldown_seconds } else { DEFAULT_COOLDOWN_SECONDS };
-        pool.bump                  = ctx.bumps.staking_pool;
+        pool.authority                  = ctx.accounts.authority.key();
+        pool.dpino_mint                 = ctx.accounts.dpino_mint.key();
+        pool.vault                      = ctx.accounts.vault.key();
+        pool.reward_vault               = ctx.accounts.reward_vault.key();
+        pool.total_staked               = 0;
+        // Flexible APYs
+        pool.soldier_apy_bps            = SOLDIER_FLEX_APY_BPS;
+        pool.general_apy_bps            = GENERAL_FLEX_APY_BPS;
+        pool.dark_lord_apy_bps          = DARK_LORD_FLEX_APY_BPS;
+        // Fixed 30-day APYs
+        pool.soldier_fixed30_apy_bps    = SOLDIER_FIXED30_APY_BPS;
+        pool.general_fixed30_apy_bps    = GENERAL_FIXED30_APY_BPS;
+        pool.dark_lord_fixed30_apy_bps  = DARK_LORD_FIXED30_APY_BPS;
+        // Fixed 90-day APYs
+        pool.soldier_fixed90_apy_bps    = SOLDIER_FIXED90_APY_BPS;
+        pool.general_fixed90_apy_bps    = GENERAL_FIXED90_APY_BPS;
+        pool.dark_lord_fixed90_apy_bps  = DARK_LORD_FIXED90_APY_BPS;
+        pool.sol_reward_lamports        = 0;
+        pool.cooldown_seconds           = if cooldown_seconds > 0 { cooldown_seconds } else { DEFAULT_COOLDOWN_SECONDS };
+        pool.bump                       = ctx.bumps.staking_pool;
         msg!(
-            "StakingPool initialized. APYs={}%/{}%/{}% Cooldown={}s",
-            pool.soldier_apy_bps / 100,
-            pool.general_apy_bps / 100,
-            pool.dark_lord_apy_bps / 100,
-            pool.cooldown_seconds
+            "StakingPool initialized. Flex APYs={}%/{}%/{}% Fixed30={}%/{}%/{}% Fixed90={}%/{}%/{}%",
+            SOLDIER_FLEX_APY_BPS/100, GENERAL_FLEX_APY_BPS/100, DARK_LORD_FLEX_APY_BPS/100,
+            SOLDIER_FIXED30_APY_BPS/100, GENERAL_FIXED30_APY_BPS/100, DARK_LORD_FIXED30_APY_BPS/100,
+            SOLDIER_FIXED90_APY_BPS/100, GENERAL_FIXED90_APY_BPS/100, DARK_LORD_FIXED90_APY_BPS/100,
         );
         Ok(())
     }
@@ -117,7 +134,7 @@ pub mod dpino_staking {
 
     // ─── User instructions ───────────────────────────────────────────────────
 
-    /// User stakes `amount` DPINO tokens into the pool.
+    /// User stakes `amount` DPINO flexibly (can withdraw after 7-day cooldown).
     pub fn stake(ctx: Context<Stake>, amount: u64) -> Result<()> {
         require!(amount > 0, StakingError::ZeroAmount);
         require!(amount >= SOLDIER_THRESHOLD, StakingError::BelowMinimumStake);
@@ -126,14 +143,12 @@ pub mod dpino_staking {
         let pool = &mut ctx.accounts.staking_pool;
         let pos  = &mut ctx.accounts.staking_position;
 
-        // Accumulate any pending DPINO rewards before changing the staked amount
+        // Accumulate pending rewards before changing staked amount
         if pos.amount_staked > 0 {
-            let rate = tier_apy_bps(pos.tier, pool);
-            let pending = calculate_rewards(pos.amount_staked, rate, pos.last_claim_time, now);
+            let pending = calculate_rewards(pos.amount_staked, pos.position_apy_bps, pos.last_claim_time, now);
             pos.dpino_rewards_pending = pos.dpino_rewards_pending.saturating_add(pending);
         }
 
-        // Transfer tokens user → vault
         let cpi_ctx = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
@@ -144,34 +159,92 @@ pub mod dpino_staking {
         );
         token::transfer(cpi_ctx, amount)?;
 
-        pos.owner                 = ctx.accounts.user.key();
-        pos.pool                  = pool.key();
-        pos.amount_staked         = pos.amount_staked.saturating_add(amount);
-        pos.start_time            = if pos.start_time == 0 { now } else { pos.start_time };
-        pos.unstake_initiated_at  = 0;
-        pos.tier                  = compute_tier(pos.amount_staked);
-        pos.last_claim_time       = now;
-        pos.bump                  = ctx.bumps.staking_position;
+        pos.owner                = ctx.accounts.user.key();
+        pos.pool                 = pool.key();
+        pos.amount_staked        = pos.amount_staked.saturating_add(amount);
+        pos.start_time           = if pos.start_time == 0 { now } else { pos.start_time };
+        pos.unstake_initiated_at = 0;
+        pos.lock_until           = 0;  // flexible — no lock
+        pos.staking_mode         = MODE_FLEXIBLE;
+        pos.tier                 = compute_tier(pos.amount_staked);
+        pos.position_apy_bps     = tier_apy_bps(pos.tier, pool); // flexible rate
+        pos.last_claim_time      = now;
+        pos.bump                 = ctx.bumps.staking_position;
+
+        pool.total_staked = pool.total_staked.saturating_add(amount);
+
+        msg!("Flexible stake: {} DPINO, Tier={}, APY={}bps", amount, pos.tier, pos.position_apy_bps);
+        Ok(())
+    }
+
+    /// User stakes `amount` DPINO in FIXED mode for `lock_days` days.
+    /// `lock_days` must be 30 or 90. Tokens cannot be withdrawn until lock expires.
+    pub fn stake_fixed(ctx: Context<Stake>, amount: u64, lock_days: u16) -> Result<()> {
+        require!(amount > 0, StakingError::ZeroAmount);
+        require!(amount >= SOLDIER_THRESHOLD, StakingError::BelowMinimumStake);
+        require!(lock_days == 30 || lock_days == 90, StakingError::InvalidLockDuration);
+
+        let now  = Clock::get()?.unix_timestamp;
+        let pool = &mut ctx.accounts.staking_pool;
+        let pos  = &mut ctx.accounts.staking_position;
+
+        // Accumulate pending rewards first
+        if pos.amount_staked > 0 {
+            let pending = calculate_rewards(pos.amount_staked, pos.position_apy_bps, pos.last_claim_time, now);
+            pos.dpino_rewards_pending = pos.dpino_rewards_pending.saturating_add(pending);
+        }
+
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from:      ctx.accounts.user_token_account.to_account_info(),
+                to:        ctx.accounts.vault.to_account_info(),
+                authority: ctx.accounts.user.to_account_info(),
+            },
+        );
+        token::transfer(cpi_ctx, amount)?;
+
+        let new_tier  = compute_tier(pos.amount_staked.saturating_add(amount));
+        let fixed_apy = fixed_tier_apy_bps(new_tier, lock_days, pool);
+        let lock_until = now + (lock_days as i64) * 24 * 60 * 60;
+
+        pos.owner                = ctx.accounts.user.key();
+        pos.pool                 = pool.key();
+        pos.amount_staked        = pos.amount_staked.saturating_add(amount);
+        pos.start_time           = if pos.start_time == 0 { now } else { pos.start_time };
+        pos.unstake_initiated_at = 0;
+        pos.lock_until           = lock_until;
+        pos.staking_mode         = MODE_FIXED;
+        pos.tier                 = new_tier;
+        pos.position_apy_bps     = fixed_apy;
+        pos.last_claim_time      = now;
+        pos.bump                 = ctx.bumps.staking_position;
 
         pool.total_staked = pool.total_staked.saturating_add(amount);
 
         msg!(
-            "Staked {} DPINO. Total={} Tier={}",
-            amount, pos.amount_staked, pos.tier
+            "Fixed stake: {} DPINO, {}days, Tier={}, APY={}bps, unlock={}",
+            amount, lock_days, new_tier, fixed_apy, lock_until
         );
         Ok(())
     }
 
-    /// Begin the 7-day unstake cooldown. Accumulates pending rewards.
+    /// Begin the 7-day unstake cooldown (flexible only).
+    /// For fixed staking, call this only after the lock period has expired.
     pub fn initiate_unstake(ctx: Context<InitiateUnstake>) -> Result<()> {
         let pool = &ctx.accounts.staking_pool;
         let pos  = &mut ctx.accounts.staking_position;
         require!(pos.amount_staked > 0, StakingError::NoActiveStake);
         require!(pos.unstake_initiated_at == 0, StakingError::CooldownAlreadyStarted);
 
-        let now     = Clock::get()?.unix_timestamp;
-        let rate    = tier_apy_bps(pos.tier, pool);
-        let pending = calculate_rewards(pos.amount_staked, rate, pos.last_claim_time, now);
+        let now = Clock::get()?.unix_timestamp;
+
+        // For fixed staking, the lock period must have expired first
+        if pos.staking_mode == MODE_FIXED {
+            require!(now >= pos.lock_until, StakingError::LockPeriodNotElapsed);
+        }
+
+        let pending = calculate_rewards(pos.amount_staked, pos.position_apy_bps, pos.last_claim_time, now);
         pos.dpino_rewards_pending = pos.dpino_rewards_pending.saturating_add(pending);
         pos.last_claim_time       = now;
         pos.unstake_initiated_at  = now;
@@ -227,7 +300,8 @@ pub mod dpino_staking {
         );
 
         let now     = Clock::get()?.unix_timestamp;
-        let rate    = tier_apy_bps(pos.tier, pool);
+        // Use the APY rate locked in at stake time (differs for flexible vs fixed)
+        let rate    = pos.position_apy_bps;
         let pending = calculate_rewards(pos.amount_staked, rate, pos.last_claim_time, now);
         let total   = pos.dpino_rewards_pending.saturating_add(pending);
 
@@ -300,12 +374,32 @@ fn compute_tier(amount: u64) -> u8 {
     else { 0 }
 }
 
+/// Returns the flexible APY rate for a tier
 fn tier_apy_bps(tier: u8, pool: &StakingPool) -> u64 {
     match tier {
         3 => pool.dark_lord_apy_bps,
         2 => pool.general_apy_bps,
         1 => pool.soldier_apy_bps,
         _ => 0,
+    }
+}
+
+/// Returns the fixed APY rate for a tier and lock duration (30 or 90 days)
+fn fixed_tier_apy_bps(tier: u8, lock_days: u16, pool: &StakingPool) -> u64 {
+    if lock_days == 90 {
+        match tier {
+            3 => pool.dark_lord_fixed90_apy_bps,
+            2 => pool.general_fixed90_apy_bps,
+            1 => pool.soldier_fixed90_apy_bps,
+            _ => 0,
+        }
+    } else {
+        match tier {
+            3 => pool.dark_lord_fixed30_apy_bps,
+            2 => pool.general_fixed30_apy_bps,
+            1 => pool.soldier_fixed30_apy_bps,
+            _ => 0,
+        }
     }
 }
 
@@ -562,22 +656,35 @@ pub struct AdminOnly<'info> {
 
 #[account]
 pub struct StakingPool {
-    pub authority:           Pubkey,  // 32
-    pub dpino_mint:          Pubkey,  // 32
-    pub vault:               Pubkey,  // 32
-    pub reward_vault:        Pubkey,  // 32
-    pub total_staked:        u64,     // 8
-    pub soldier_apy_bps:     u64,     // 8  — 1200 = 12%
-    pub general_apy_bps:     u64,     // 8  — 1800 = 18%
-    pub dark_lord_apy_bps:   u64,     // 8  — 2400 = 24%
-    pub sol_reward_lamports: u64,     // 8  — pending SOL distribution pool
-    pub cooldown_seconds:    i64,     // 8
-    pub bump:                u8,      // 1
+    pub authority:                 Pubkey,  // 32
+    pub dpino_mint:                Pubkey,  // 32
+    pub vault:                     Pubkey,  // 32
+    pub reward_vault:              Pubkey,  // 32
+    pub total_staked:              u64,     // 8
+    // Flexible APYs
+    pub soldier_apy_bps:           u64,     // 8   12%
+    pub general_apy_bps:           u64,     // 8   18%
+    pub dark_lord_apy_bps:         u64,     // 8   24%
+    // Fixed 30-day APYs
+    pub soldier_fixed30_apy_bps:   u64,     // 8   20%
+    pub general_fixed30_apy_bps:   u64,     // 8   28%
+    pub dark_lord_fixed30_apy_bps: u64,     // 8   36%
+    // Fixed 90-day APYs
+    pub soldier_fixed90_apy_bps:   u64,     // 8   30%
+    pub general_fixed90_apy_bps:   u64,     // 8   42%
+    pub dark_lord_fixed90_apy_bps: u64,     // 8   54%
+    pub sol_reward_lamports:       u64,     // 8
+    pub cooldown_seconds:          i64,     // 8
+    pub bump:                      u8,      // 1
 }
 
 impl StakingPool {
-    pub const LEN: usize = 8 + 32 + 32 + 32 + 32 + 8 + 8 + 8 + 8 + 8 + 8 + 1 + 64;
+    pub const LEN: usize = 8 + 32 + 32 + 32 + 32 + 8 + (8 * 9) + 8 + 8 + 1 + 128;
 }
+
+/// Staking mode stored on the position
+pub const MODE_FLEXIBLE: u8 = 0;
+pub const MODE_FIXED:    u8 = 1;
 
 #[account]
 pub struct StakingPosition {
@@ -585,15 +692,18 @@ pub struct StakingPosition {
     pub pool:                  Pubkey,  // 32
     pub amount_staked:         u64,     // 8
     pub start_time:            i64,     // 8
-    pub unstake_initiated_at:  i64,     // 8  (0 = none)
+    pub unstake_initiated_at:  i64,     // 8  (0 = none, flexible only)
+    pub lock_until:            i64,     // 8  (0 = flexible, else Unix timestamp)
     pub tier:                  u8,      // 1  (0=none 1=soldier 2=general 3=dark_lord)
-    pub dpino_rewards_pending: u64,     // 8  — accumulated but unclaimed DPINO
+    pub staking_mode:          u8,      // 1  (0=flexible 1=fixed)
+    pub dpino_rewards_pending: u64,     // 8
+    pub position_apy_bps:      u64,     // 8  — actual APY rate locked in at stake time
     pub last_claim_time:       i64,     // 8
     pub bump:                  u8,      // 1
 }
 
 impl StakingPosition {
-    pub const LEN: usize = 8 + 32 + 32 + 8 + 8 + 8 + 1 + 8 + 8 + 1 + 64;
+    pub const LEN: usize = 8 + 32 + 32 + 8 + 8 + 8 + 8 + 1 + 1 + 8 + 8 + 8 + 1 + 64;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -622,6 +732,10 @@ pub enum StakingError {
     InsufficientSolVault,
     #[msg("Invalid APY rate (must be <= 10000 bps)")]
     InvalidRewardRate,
+    #[msg("Lock duration must be 30 or 90 days")]
+    InvalidLockDuration,
+    #[msg("Fixed lock period has not elapsed yet — tokens are locked")]
+    LockPeriodNotElapsed,
     #[msg("Token mint does not match the pool")]
     InvalidMint,
     #[msg("Token account owner mismatch")]

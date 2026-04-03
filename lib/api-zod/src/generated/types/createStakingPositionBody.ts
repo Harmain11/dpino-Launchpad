@@ -9,4 +9,6 @@
 export interface CreateStakingPositionBody {
   walletAddress: string;
   amountStaked: number;
+  stakingType?: string;
+  lockDurationDays?: number | null;
 }

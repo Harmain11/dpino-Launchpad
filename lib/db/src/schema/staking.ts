@@ -1,4 +1,4 @@
-import { pgTable, text, serial, real, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, real, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -8,6 +8,9 @@ export const stakingPositionsTable = pgTable("staking_positions", {
   amountStaked: real("amount_staked").notNull(),
   tier: text("tier").notNull(),
   rewardsEarned: real("rewards_earned").notNull().default(0),
+  stakingType: text("staking_type").notNull().default("flexible"),
+  lockDurationDays: integer("lock_duration_days"),
+  lockUntil: timestamp("lock_until"),
   stakedAt: timestamp("staked_at").defaultNow().notNull(),
 });
 

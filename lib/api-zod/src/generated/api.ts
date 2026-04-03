@@ -128,6 +128,9 @@ export const ListStakingPositionsResponseItem = zod.object({
   amountStaked: zod.number(),
   tier: zod.string(),
   rewardsEarned: zod.number(),
+  stakingType: zod.string(),
+  lockDurationDays: zod.number().nullable().optional(),
+  lockUntil: zod.string().nullable().optional(),
   stakedAt: zod.coerce.date(),
 });
 export const ListStakingPositionsResponse = zod.array(
@@ -140,6 +143,8 @@ export const ListStakingPositionsResponse = zod.array(
 export const CreateStakingPositionBody = zod.object({
   walletAddress: zod.string(),
   amountStaked: zod.number(),
+  stakingType: zod.enum(["flexible", "fixed"]).optional().default("flexible"),
+  lockDurationDays: zod.number().nullable().optional(),
 });
 
 /**

@@ -68,6 +68,9 @@ function mapPosition(p: typeof stakingPositionsTable.$inferSelect) {
     amountStaked: p.amountStaked,
     tier: p.tier,
     rewardsEarned: p.rewardsEarned,
+    stakingType: p.stakingType ?? "flexible",
+    lockDurationDays: p.lockDurationDays ?? null,
+    lockUntil: p.lockUntil ? p.lockUntil.toISOString() : null,
     stakedAt: p.stakedAt.toISOString(),
   };
 }
@@ -104,14 +107,22 @@ router2.post("/staking/positions", async (req, res) => {
     return;
   }
 
-  const { walletAddress, amountStaked } = parsed.data;
+  const { walletAddress, amountStaked, stakingType, lockDurationDays } = parsed.data;
   const tier = getTierForAmount(amountStaked);
+
+  const isFixed = stakingType === "fixed" && lockDurationDays && lockDurationDays > 0;
+  const lockUntil = isFixed
+    ? new Date(Date.now() + lockDurationDays! * 24 * 60 * 60 * 1000)
+    : null;
 
   const [position] = await db.insert(stakingPositionsTable).values({
     walletAddress,
     amountStaked,
     tier,
     rewardsEarned: 0,
+    stakingType: stakingType ?? "flexible",
+    lockDurationDays: isFixed ? lockDurationDays : null,
+    lockUntil,
   }).returning();
 
   const response = ListStakingPositionsResponseItem.parse(mapPosition(position));

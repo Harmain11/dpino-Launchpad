@@ -12,5 +12,8 @@ export interface StakingPosition {
   amountStaked: number;
   tier: string;
   rewardsEarned: number;
+  stakingType: string;
+  lockDurationDays?: number | null;
+  lockUntil?: string | null;
   stakedAt: Date;
 }
