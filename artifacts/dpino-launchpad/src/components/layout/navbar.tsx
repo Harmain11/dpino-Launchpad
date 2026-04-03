@@ -112,8 +112,8 @@ export function Navbar() {
 
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-sm bg-black border border-primary/30 flex items-center justify-center shadow-[0_0_15px_rgba(245,158,11,0.2)] group-hover:border-primary transition-colors">
-              <span className="font-bold text-primary font-mono text-sm leading-none">DP</span>
+            <div className="w-9 h-9 rounded-sm overflow-hidden border border-primary/30 shadow-[0_0_15px_rgba(245,158,11,0.2)] group-hover:border-primary transition-colors shrink-0">
+              <img src="/dpino-logo.jpeg" alt="DPINO" className="w-full h-full object-cover" />
             </div>
             <span className="font-bold text-lg tracking-tight hidden sm:block">
               DPINO<span className="text-primary">.LAUNCH</span>

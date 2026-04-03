@@ -16,8 +16,8 @@ export function Layout({ children }: LayoutProps) {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-sm bg-black border border-primary/30 flex items-center justify-center">
-                <span className="font-bold text-primary font-mono text-sm leading-none">DP</span>
+              <div className="w-8 h-8 rounded-sm overflow-hidden border border-primary/30 shrink-0">
+                <img src="/dpino-logo.jpeg" alt="DPINO" className="w-full h-full object-cover" />
               </div>
               <span className="font-bold text-lg tracking-tight">
                 DPINO<span className="text-primary">.LAUNCH</span>
