@@ -21,4 +21,5 @@ export interface CreateProjectBody {
   twitterUrl?: string;
   telegramUrl?: string;
   category: string;
+  minTierRequired?: string;
 }

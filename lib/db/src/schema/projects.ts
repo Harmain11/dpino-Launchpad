@@ -25,6 +25,7 @@ export const projectsTable = pgTable("projects", {
   telegramUrl: text("telegram_url"),
   participants: integer("participants").notNull().default(0),
   category: text("category").notNull(),
+  minTierRequired: text("min_tier_required").notNull().default("none"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

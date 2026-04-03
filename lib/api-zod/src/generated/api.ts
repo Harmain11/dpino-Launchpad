@@ -44,6 +44,7 @@ export const ListProjectsResponseItem = zod.object({
   telegramUrl: zod.string().optional(),
   participants: zod.number(),
   category: zod.string(),
+  minTierRequired: zod.string(),
   createdAt: zod.coerce.date(),
 });
 export const ListProjectsResponse = zod.array(ListProjectsResponseItem);
@@ -66,6 +67,7 @@ export const CreateProjectBody = zod.object({
   twitterUrl: zod.string().optional(),
   telegramUrl: zod.string().optional(),
   category: zod.string(),
+  minTierRequired: zod.string().optional(),
 });
 
 /**
@@ -96,6 +98,7 @@ export const GetProjectResponse = zod.object({
   telegramUrl: zod.string().optional(),
   participants: zod.number(),
   category: zod.string(),
+  minTierRequired: zod.string(),
   createdAt: zod.coerce.date(),
 });
 
@@ -175,6 +178,7 @@ export const GetFeaturedProjectsResponseItem = zod.object({
   telegramUrl: zod.string().optional(),
   participants: zod.number(),
   category: zod.string(),
+  minTierRequired: zod.string(),
   createdAt: zod.coerce.date(),
 });
 export const GetFeaturedProjectsResponse = zod.array(

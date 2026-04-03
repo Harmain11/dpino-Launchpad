@@ -38,6 +38,7 @@ export interface Project {
   telegramUrl?: string;
   participants: number;
   category: string;
+  minTierRequired: string;
   createdAt: string;
 }
 
@@ -56,6 +57,7 @@ export interface CreateProjectBody {
   twitterUrl?: string;
   telegramUrl?: string;
   category: string;
+  minTierRequired?: string;
 }
 
 export interface StakingTier {

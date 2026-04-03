@@ -33,6 +33,7 @@ function mapProject(p: typeof projectsTable.$inferSelect) {
     telegramUrl: p.telegramUrl ?? undefined,
     participants: p.participants,
     category: p.category,
+    minTierRequired: p.minTierRequired ?? "none",
     createdAt: p.createdAt.toISOString(),
   };
 }
@@ -149,6 +150,14 @@ router.put("/projects/:id", async (req, res) => {
   if ("telegramUrl" in body)  updateFields.telegramUrl  = body.telegramUrl as string | null as unknown as undefined;
   if (body.startDate !== undefined) updateFields.startDate = new Date(String(body.startDate));
   if (body.endDate !== undefined)   updateFields.endDate   = new Date(String(body.endDate));
+  const VALID_TIERS = ["none", "soldier", "general", "dark_lord"];
+  if (body.minTierRequired !== undefined) {
+    if (!VALID_TIERS.includes(body.minTierRequired as string)) {
+      res.status(400).json({ error: "bad_request", message: "Invalid tier value" });
+      return;
+    }
+    updateFields.minTierRequired = body.minTierRequired as string;
+  }
 
   if (Object.keys(updateFields).length === 0) {
     res.status(400).json({ error: "bad_request", message: "No updatable fields provided" });

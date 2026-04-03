@@ -1,11 +1,12 @@
 import React, { useState } from "react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGetStakingTiers, useListStakingPositions, useCreateStakingPosition, getListStakingPositionsQueryKey } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
-import { Shield, Zap, Crown, CheckCircle2, AlertCircle, Wallet } from "lucide-react";
+import { Shield, Zap, Crown, CheckCircle2, AlertCircle, Wallet, Lock, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
@@ -104,7 +105,7 @@ export default function Stake() {
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,rgba(43,43,43,0.4),transparent_50%)] pointer-events-none" />
 
       <div className="container px-4 relative z-10">
-        <div className="text-center max-w-3xl mx-auto mb-16">
+        <div className="text-center max-w-3xl mx-auto mb-10">
           <Badge className="bg-primary/10 text-primary border-primary/20 mb-4 uppercase tracking-widest">
             Elite Access Protocol
           </Badge>
@@ -115,6 +116,46 @@ export default function Stake() {
             Lock your tokens to gain guaranteed launch allocations, multiplier bonuses, and a share of the 0.5% protocol fee from every launch.
           </p>
         </div>
+
+        {/* Tier → IDO Access Banner */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+          className="max-w-4xl mx-auto mb-16 border border-primary/20 bg-primary/5 rounded-sm p-6"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Lock className="w-4 h-4 text-primary" />
+            <h3 className="text-sm font-bold uppercase tracking-widest text-primary">Your Tier Unlocks IDO Access</h3>
+          </div>
+          <p className="text-sm text-muted-foreground mb-5">
+            IDOs on the DPINO Launchpad are tier-gated. Stake enough $DPINO to reach the required tier before participating.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { tier: "SOLDIER", amount: "100K", min: "100,000", icon: Shield, color: "text-amber-400", border: "border-amber-500/40 bg-amber-500/5", desc: "Access to standard IDOs" },
+              { tier: "GENERAL", amount: "500K", min: "500,000", icon: Zap, color: "text-violet-400", border: "border-violet-500/40 bg-violet-500/5", desc: "Access to premium IDOs + higher allocations" },
+              { tier: "DARK LORD", amount: "1M", min: "1,000,000", icon: Crown, color: "text-yellow-300", border: "border-yellow-400/40 bg-yellow-500/5", desc: "Full access to all IDOs + max multiplier" },
+            ].map(({ tier, amount, min, icon: Icon, color, border, desc }) => (
+              <div key={tier} className={`border rounded-sm p-4 ${border}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon className={`w-4 h-4 ${color}`} />
+                  <span className={`text-xs font-bold uppercase tracking-widest ${color}`}>{tier}</span>
+                </div>
+                <p className={`font-mono text-lg font-black mb-1 ${color}`}>{amount} DPINO</p>
+                <p className="text-xs text-muted-foreground">{desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 pt-4 border-t border-white/10 flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">View open IDOs to see which tier is required.</p>
+            <Link href="/projects">
+              <Button variant="ghost" className="text-xs text-primary hover:text-primary h-7 px-3 hover:bg-primary/10">
+                Browse IDOs <ArrowRight className="w-3 h-3 ml-1" />
+              </Button>
+            </Link>
+          </div>
+        </motion.div>
 
         {/* Tiers */}
         <div className="mb-20">

@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useParams } from "wouter";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useGetProject } from "@workspace/api-client-react";
+import { useGetProject, useListStakingPositions } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
-import { Clock, Globe, Twitter, MessageCircle, AlertCircle, Copy, CheckCircle2, Wallet, ExternalLink, ArrowRight } from "lucide-react";
+import { Clock, Globe, Twitter, MessageCircle, AlertCircle, Copy, CheckCircle2, Wallet, ExternalLink, ArrowRight, Lock, Shield, Zap, Crown } from "lucide-react";
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,30 @@ import { useDpinoBalance } from "@/hooks/useDpinoBalance";
 import { useDpinoPrice } from "@/hooks/useDpinoPrice";
 import { TREASURY_WALLET } from "@/providers/SolanaWalletProvider";
 import { useToast } from "@/hooks/use-toast";
+
+// ─── Tier utilities ───────────────────────────────────────────────────────────
+const TIER_ORDER: Record<string, number> = { none: 0, soldier: 1, general: 2, dark_lord: 3 };
+
+function tierLabel(tier: string) {
+  if (tier === "dark_lord") return "DARK LORD";
+  return tier.toUpperCase();
+}
+
+function tierIcon(tier: string, size = 14) {
+  if (tier === "dark_lord") return <Crown size={size} className="text-yellow-300" />;
+  if (tier === "general")   return <Zap size={size} className="text-violet-400" />;
+  if (tier === "soldier")   return <Shield size={size} className="text-amber-400" />;
+  return null;
+}
+
+function tierColor(tier: string) {
+  if (tier === "dark_lord") return "border-yellow-400/50 bg-yellow-400/10 text-yellow-300";
+  if (tier === "general")   return "border-violet-500/50 bg-violet-500/10 text-violet-400";
+  if (tier === "soldier")   return "border-amber-500/50 bg-amber-500/10 text-amber-400";
+  return "border-white/10 bg-white/5 text-muted-foreground";
+}
+
+function tierStakeUrl() { return "/stake"; }
 
 const DPINO_MINT = "4fwCUiZ8qaddK3WFLXazXRtpYpHc39iYLnEfF7KjmoEy";
 
@@ -62,11 +87,29 @@ export default function ProjectDetail() {
   const { publicKey, connected } = useWallet();
   const { data: priceData } = useDpinoPrice();
   const { data: dpBalance } = useDpinoBalance();
+  const walletAddress = publicKey?.toBase58() ?? "";
 
   const { data: project, isLoading } = useGetProject(id!, { query: { enabled: !!id } });
+  const { data: myPositions } = useListStakingPositions(
+    { walletAddress },
+    { query: { enabled: connected && !!walletAddress } }
+  );
+
   const [participateAmount, setParticipateAmount] = useState("");
   const [participateModal, setParticipateModal] = useState(false);
   const [copiedAddr, setCopiedAddr] = useState(false);
+
+  // Determine user's highest staking tier
+  const userTierStr = myPositions && myPositions.length > 0
+    ? myPositions.reduce((best, p) => {
+        const t = p.tier.toLowerCase().replace(" ", "_");
+        return (TIER_ORDER[t] ?? 0) > (TIER_ORDER[best] ?? 0) ? t : best;
+      }, "none")
+    : "none";
+
+  const minTierStr = project?.minTierRequired ?? "none";
+  const hasRequiredTier = (TIER_ORDER[userTierStr] ?? 0) >= (TIER_ORDER[minTierStr] ?? 0);
+  const tierGated = minTierStr !== "none" && connected && !hasRequiredTier;
 
   const countdownDate = project
     ? project.status === "live" ? project.endDate : project.startDate
@@ -104,6 +147,10 @@ export default function ProjectDetail() {
   const handleParticipate = () => {
     if (!connected) {
       toast({ title: "Connect Wallet", description: "Connect your Solana wallet first.", variant: "destructive" });
+      return;
+    }
+    if (tierGated) {
+      toast({ title: "Tier Required", description: `This IDO requires ${tierLabel(minTierStr)} tier. Stake $DPINO to unlock.`, variant: "destructive" });
       return;
     }
     if (!participateAmount || isNaN(amountNum) || amountNum <= 0) {
@@ -216,6 +263,16 @@ export default function ProjectDetail() {
                     <p className="text-base text-foreground font-bold">{value}</p>
                   </div>
                 ))}
+
+                {minTierStr !== "none" && (
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Min Tier</p>
+                    <span className={`inline-flex items-center gap-1.5 border rounded-sm px-2.5 py-1 text-xs font-bold uppercase tracking-widest ${tierColor(minTierStr)}`}>
+                      {tierIcon(minTierStr, 12)}
+                      {tierLabel(minTierStr)}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Buy DPINO CTA */}
@@ -316,10 +373,50 @@ export default function ProjectDetail() {
                 </div>
               )}
 
+              {/* Tier requirement badge in sidebar */}
+              {minTierStr !== "none" && (
+                <div className={`flex items-center gap-2 border rounded-sm px-3 py-2 ${tierColor(minTierStr)}`}>
+                  <Lock className="w-3 h-3 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-[10px] uppercase tracking-widest opacity-70 mb-0.5">Tier Required</p>
+                    <div className="flex items-center gap-1">
+                      {tierIcon(minTierStr, 12)}
+                      <span className="text-xs font-bold">{tierLabel(minTierStr)}</span>
+                    </div>
+                  </div>
+                  {connected && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${hasRequiredTier ? "border-green-500/40 bg-green-500/10 text-green-400" : "border-red-500/40 bg-red-500/10 text-red-400"}`}>
+                      {hasRequiredTier ? "✓ UNLOCKED" : "✗ LOCKED"}
+                    </span>
+                  )}
+                </div>
+              )}
+
               {/* CTA */}
               {project.status === "live" ? (
                 <div className="space-y-3">
-                  <div className="space-y-2">
+                  {/* Tier gate block — shown when wallet connected but tier insufficient */}
+                  {tierGated && (
+                    <div className="border border-red-500/30 bg-red-500/5 rounded-sm p-4 space-y-3">
+                      <div className="flex items-center gap-2 text-red-400">
+                        <Lock className="w-4 h-4 shrink-0" />
+                        <p className="text-xs font-bold uppercase tracking-wider">IDO Access Locked</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        This IDO requires{" "}
+                        <span className={`font-bold ${tierColor(minTierStr).split(" ").find(c => c.startsWith("text-"))}`}>{tierLabel(minTierStr)}</span>{" "}
+                        tier. Your current tier:{" "}
+                        <span className="font-bold text-foreground">{userTierStr === "none" ? "No stake" : tierLabel(userTierStr)}</span>.
+                      </p>
+                      <Link href="/stake">
+                        <Button className="w-full h-9 text-xs font-bold uppercase tracking-widest bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20 rounded-sm">
+                          Stake $DPINO to Unlock <ArrowRight className="w-3 h-3 ml-1" />
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+
+                  <div className={`space-y-2 ${tierGated ? "opacity-40 pointer-events-none" : ""}`}>
                     <Label htmlFor="inv-amount" className="text-xs uppercase tracking-widest text-muted-foreground">
                       Amount in $DPINO
                     </Label>

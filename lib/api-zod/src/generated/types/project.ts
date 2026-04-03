@@ -28,5 +28,6 @@ export interface Project {
   telegramUrl?: string;
   participants: number;
   category: string;
+  minTierRequired: string;
   createdAt: Date;
 }

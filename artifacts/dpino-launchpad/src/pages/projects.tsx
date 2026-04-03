@@ -8,8 +8,27 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useListProjects } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
-import { Clock, Search, Filter } from "lucide-react";
+import { Clock, Search, Filter, Lock, Shield, Zap, Crown } from "lucide-react";
 import { Input } from "@/components/ui/input";
+
+function tierLabel(tier: string) {
+  if (tier === "dark_lord") return "DARK LORD";
+  return tier.toUpperCase();
+}
+
+function tierColor(tier: string) {
+  if (tier === "dark_lord") return "border-yellow-400/60 bg-yellow-400/10 text-yellow-300";
+  if (tier === "general")   return "border-violet-500/60 bg-violet-500/10 text-violet-400";
+  if (tier === "soldier")   return "border-amber-500/60 bg-amber-500/10 text-amber-400";
+  return "";
+}
+
+function TierIcon({ tier, size = 10 }: { tier: string; size?: number }) {
+  if (tier === "dark_lord") return <Crown size={size} />;
+  if (tier === "general")   return <Zap size={size} />;
+  if (tier === "soldier")   return <Shield size={size} />;
+  return null;
+}
 
 function formatDpino(num: number | undefined | null): string {
   if (num === undefined || num === null || isNaN(num as number)) return "0";
@@ -145,6 +164,13 @@ export default function Projects() {
                             </h3>
                             <p className="text-sm font-mono text-muted-foreground">${project.ticker}</p>
                           </div>
+                          {project.minTierRequired && project.minTierRequired !== "none" && (
+                            <div className={`flex items-center gap-1 border rounded-sm px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${tierColor(project.minTierRequired)}`}>
+                              <Lock size={9} />
+                              <TierIcon tier={project.minTierRequired} size={9} />
+                              {tierLabel(project.minTierRequired)}
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex-1">
