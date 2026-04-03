@@ -9,6 +9,7 @@ import Projects from "@/pages/projects";
 import ProjectDetail from "@/pages/project-detail";
 import Stake from "@/pages/stake";
 import Apply from "@/pages/apply";
+import Admin from "@/pages/admin";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -29,6 +30,7 @@ function Router() {
         <Route path="/projects/:id" component={ProjectDetail} />
         <Route path="/stake" component={Stake} />
         <Route path="/apply" component={Apply} />
+        <Route path="/admin" component={Admin} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

@@ -118,4 +118,18 @@ router2.post("/staking/positions", async (req, res) => {
   res.status(201).json(response);
 });
 
+router2.delete("/staking/positions/:id", async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) {
+    res.status(400).json({ error: "bad_request", message: "Invalid ID" });
+    return;
+  }
+  const [deleted] = await db.delete(stakingPositionsTable).where(eq(stakingPositionsTable.id, id)).returning();
+  if (!deleted) {
+    res.status(404).json({ error: "not_found" });
+    return;
+  }
+  res.json({ success: true, id: String(id) });
+});
+
 export default router2;

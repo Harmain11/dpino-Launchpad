@@ -19,6 +19,38 @@ Built as a pnpm workspace monorepo using TypeScript.
 ### API Field
 `totalRaisedDpino` (renamed from `totalRaisedUsd`) in `/api/stats/platform` response
 
+### Smart Contract Review (Anchor)
+Both contracts are logically correct and ready for local compilation:
+
+**dpino-staking:**
+- Thresholds: SOLDIER=100K×10^9, GENERAL=500K×10^9, DARK_LORD=1M×10^9 ✅
+- SPL token transfer user → vault on stake ✅
+- Reward accumulation before re-stake (no double-counting) ✅
+- 7-day cooldown on unstake ✅
+- Tier auto-assigned from amount ✅
+
+**dpino-ido:**
+- All amounts in $DPINO base units (9 decimals) ✅
+- 0.5% protocol fee (50 BPS) to fee vault ✅
+- Hard cap, soft cap, min/max allocation enforcement ✅
+- Tier gating (min_tier_required) ✅
+- Finalization + token claim + refund (if soft cap not met) ✅
+
+**Before mainnet deployment (must do locally):**
+1. `cd contracts && anchor build && anchor keys list` → get real program IDs
+2. Update `Anchor.toml` + both `declare_id!()` macros + `SolanaWalletProvider.tsx`
+3. Fund protocol fee vault and reward vault
+4. Test on devnet first
+
+### Admin Panel
+Available at `/admin` (hidden URL, no authentication).
+Supports: Add Project, Edit Project, Delete Project, Change Status (upcoming/live/ended).
+New projects always start as UPCOMING — change to LIVE to open for participation.
+
+### Database State
+Database is CLEAN — all dummy data removed. Ready for real projects only.
+Use `/admin` to add real token launches, or `/apply` for project teams to submit their own.
+
 ## Stack
 
 - **Monorepo tool**: pnpm workspaces
