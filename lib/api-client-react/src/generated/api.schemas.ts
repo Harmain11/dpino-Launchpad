@@ -83,7 +83,7 @@ export interface CreateStakingPositionBody {
 
 export interface PlatformStats {
   totalProjectsLaunched: number;
-  totalRaisedUsd: number;
+  totalRaisedDpino: number;
   totalStakers: number;
   totalDpinoStaked: number;
   activeLaunches: number;

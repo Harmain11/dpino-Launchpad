@@ -48,7 +48,7 @@ router.get("/stats/platform", async (_req, res) => {
 
   const response = GetPlatformStatsResponse.parse({
     totalProjectsLaunched: totalLaunched,
-    totalRaisedUsd: Number(totalRaised.total ?? 0),
+    totalRaisedDpino: Number(totalRaised.total ?? 0),
     totalStakers: stakerCount.count,
     totalDpinoStaked: Number(totalStaked.total ?? 0),
     activeLaunches: liveCount.count,

@@ -346,8 +346,9 @@ components:
       properties:
         totalProjectsLaunched:
           type: integer
-        totalRaisedUsd:
+        totalRaisedDpino:
           type: number
+          description: Total $DPINO raised across all IDOs
         totalStakers:
           type: integer
         totalDpinoStaked:
@@ -358,7 +359,7 @@ components:
           type: number
       required:
         - totalProjectsLaunched
-        - totalRaisedUsd
+        - totalRaisedDpino
         - totalStakers
         - totalDpinoStaked
         - activeLaunches

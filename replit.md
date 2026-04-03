@@ -1,8 +1,23 @@
-# Workspace
+# DPINO Launchpad
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+Full-stack DPINO Launchpad — the curated token launch platform for the $DPINO (Dark Pino) Solana meme coin ecosystem.
+Built as a pnpm workspace monorepo using TypeScript.
+
+### Key Architecture Decisions
+- **All IDO participation, fees, and allocations are denominated in $DPINO** (not SOL or USDC)
+- **$DPINO token**: `4fwCUiZ8qaddK3WFLXazXRtpYpHc39iYLnEfF7KjmoEy` — 9 decimals, ~987B supply
+- **0.5% protocol fee** on every IDO participation routes to DPINO/SOL LP on Raydium
+- **Staking tiers** (9-decimal thresholds): SOLDIER=100K DPINO, GENERAL=500K DPINO, DARK LORD=1M DPINO
+- **DEX Screener pair**: `8wKQuMgoXKV9w8Vn8CpsA2g2WckuVs3ChcN5ZNp8mcNM`
+- **Rust compilation** not possible in Replit NixOS — build Anchor contracts locally (see `contracts/DEPLOY.md`)
+
+### DB Fields (all DPINO amounts, not USD)
+`totalRaise`, `raisedAmount`, `tokenPrice`, `minAllocation`, `maxAllocation` → represent raw DPINO token amounts
+
+### API Field
+`totalRaisedDpino` (renamed from `totalRaisedUsd`) in `/api/stats/platform` response
 
 ## Stack
 

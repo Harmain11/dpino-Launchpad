@@ -7,12 +7,12 @@ declare_id!("DPIdo1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// DPINO Staking program ID (for tier CPI read, cross-program check)
-pub const STAKING_PROGRAM_ID: &str = "DPStak1ngXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX";
+/// $DPINO token mint (mainnet)
+pub const DPINO_MINT: &str = "4fwCUiZ8qaddK3WFLXazXRtpYpHc39iYLnEfF7KjmoEy";
 
-/// Protocol fee to DPINO treasury: 50 bps = 0.5%
+/// Protocol fee to DPINO/SOL LP on Raydium: 50 bps = 0.5%
 pub const PROTOCOL_FEE_BPS: u64 = 50;
-pub const BPS_DENOMINATOR: u64  = 10_000;
+pub const BPS_DENOMINATOR:  u64 = 10_000;
 
 /// Maximum project name length (UTF-8 bytes)
 pub const MAX_NAME_LEN: usize = 64;
@@ -36,6 +36,8 @@ pub mod dpino_ido {
     // ──────────────────────────────────────────────────────────────────────────
 
     /// Initialize a new IDO pool. Called by the DPINO Launchpad admin.
+    /// All caps and allocations are denominated in $DPINO (base units, 9 decimals).
+    /// Users pay with $DPINO; fees go to the DPINO/SOL LP on Raydium.
     pub fn initialize_ido(
         ctx:    Context<InitializeIdo>,
         params: IdoParams,
@@ -44,35 +46,36 @@ pub mod dpino_ido {
 
         let ido = &mut ctx.accounts.ido_pool;
 
-        ido.authority          = ctx.accounts.authority.key();
-        ido.project_name       = params.project_name;
-        ido.token_price_lamports = params.token_price_lamports;
-        ido.hard_cap_lamports  = params.hard_cap_lamports;
-        ido.soft_cap_lamports  = params.soft_cap_lamports;
-        ido.start_time         = params.start_time;
-        ido.end_time           = params.end_time;
-        ido.min_allocation_lamports = params.min_allocation_lamports;
-        ido.max_allocation_lamports = params.max_allocation_lamports;
-        ido.min_tier_required  = params.min_tier_required;
-        ido.total_raised_lamports = 0;
-        ido.participants       = 0;
-        ido.token_mint         = None;
-        ido.is_finalized       = false;
-        ido.tokens_distributed = false;
-        ido.bump               = ctx.bumps.ido_pool;
+        ido.authority             = ctx.accounts.authority.key();
+        ido.dpino_mint            = ctx.accounts.dpino_mint.key();
+        ido.project_name          = params.project_name;
+        ido.token_price_dpino     = params.token_price_dpino;     // DPINO per 1 project token
+        ido.hard_cap_dpino        = params.hard_cap_dpino;         // max DPINO to raise
+        ido.soft_cap_dpino        = params.soft_cap_dpino;         // min DPINO for success
+        ido.start_time            = params.start_time;
+        ido.end_time              = params.end_time;
+        ido.min_allocation_dpino  = params.min_allocation_dpino;  // min per user
+        ido.max_allocation_dpino  = params.max_allocation_dpino;  // max per user
+        ido.min_tier_required     = params.min_tier_required;
+        ido.total_raised_dpino    = 0;
+        ido.participants          = 0;
+        ido.token_mint            = None;
+        ido.is_finalized          = false;
+        ido.tokens_distributed    = false;
+        ido.bump                  = ctx.bumps.ido_pool;
 
         msg!(
-            "IDO '{}' created. Hard cap={}L Soft cap={}L Start={} End={}",
+            "IDO '{}' created. Hard cap={} DPINO Soft cap={} DPINO Start={} End={}",
             ido.project_name,
-            ido.hard_cap_lamports,
-            ido.soft_cap_lamports,
+            ido.hard_cap_dpino,
+            ido.soft_cap_dpino,
             ido.start_time,
             ido.end_time,
         );
         Ok(())
     }
 
-    /// Admin sets the token mint after TGE so users can claim.
+    /// Admin sets the project token mint after TGE so users can claim.
     pub fn set_token_mint(ctx: Context<AdminIdo>) -> Result<()> {
         let ido = &mut ctx.accounts.ido_pool;
         require!(ido.is_finalized, IdoError::NotFinalized);
@@ -88,18 +91,27 @@ pub mod dpino_ido {
         let now = Clock::get()?.unix_timestamp;
         require!(now >= ido.end_time, IdoError::IdoStillActive);
         ido.is_finalized = true;
-        msg!("IDO '{}' finalized. Raised {}L over {} participants.",
-            ido.project_name, ido.total_raised_lamports, ido.participants);
+        msg!(
+            "IDO '{}' finalized. Raised {} DPINO over {} participants.",
+            ido.project_name,
+            ido.total_raised_dpino,
+            ido.participants
+        );
         Ok(())
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // User: Participate
+    // User: Participate — Pay with $DPINO
     // ──────────────────────────────────────────────────────────────────────────
 
-    /// Contribute SOL to an active IDO.
-    /// The user's `staking_position` account is passed to verify tier gating.
-    pub fn participate(ctx: Context<Participate>, amount_lamports: u64) -> Result<()> {
+    /// Contribute $DPINO to an active IDO.
+    /// amount_dpino is in raw DPINO base units (divide by 10^9 for UI amount).
+    ///
+    /// Flow:
+    ///   user's DPINO ATA → IDO vault (DPINO token account)
+    ///   fee portion       → protocol fee vault (DPINO token account)
+    ///   Both feed the DPINO/SOL LP on Raydium after IDO ends.
+    pub fn participate(ctx: Context<Participate>, amount_dpino: u64) -> Result<()> {
         let ido = &mut ctx.accounts.ido_pool;
         let now = Clock::get()?.unix_timestamp;
 
@@ -110,13 +122,13 @@ pub mod dpino_ido {
 
         // Hard cap check
         require!(
-            ido.total_raised_lamports.saturating_add(amount_lamports) <= ido.hard_cap_lamports,
+            ido.total_raised_dpino.saturating_add(amount_dpino) <= ido.hard_cap_dpino,
             IdoError::HardCapExceeded
         );
 
         // Allocation checks
-        require!(amount_lamports >= ido.min_allocation_lamports, IdoError::BelowMinAllocation);
-        require!(amount_lamports <= ido.max_allocation_lamports, IdoError::ExceedsMaxAllocation);
+        require!(amount_dpino >= ido.min_allocation_dpino, IdoError::BelowMinAllocation);
+        require!(amount_dpino <= ido.max_allocation_dpino, IdoError::ExceedsMaxAllocation);
 
         // Tier gating: if IDO requires a minimum tier, verify on-chain staking position
         if ido.min_tier_required > TIER_NONE {
@@ -127,31 +139,36 @@ pub mod dpino_ido {
         }
 
         // Idempotency: if user already has an allocation, add to it
-        let allocation = &mut ctx.accounts.user_allocation;
-        let new_total  = allocation.amount_paid_lamports.saturating_add(amount_lamports);
-        require!(new_total <= ido.max_allocation_lamports, IdoError::ExceedsMaxAllocation);
+        let allocation  = &mut ctx.accounts.user_allocation;
+        let new_total   = allocation.amount_paid_dpino.saturating_add(amount_dpino);
+        require!(new_total <= ido.max_allocation_dpino, IdoError::ExceedsMaxAllocation);
 
-        // Transfer SOL from user → IDO vault (PDA)
-        let cpi_ctx = anchor_lang::system_program::Transfer {
-            from: ctx.accounts.user.to_account_info(),
-            to:   ctx.accounts.ido_vault.to_account_info(),
-        };
-        anchor_lang::system_program::transfer(
-            CpiContext::new(ctx.accounts.system_program.to_account_info(), cpi_ctx),
-            amount_lamports,
-        )?;
+        // Compute fee: 0.5% in DPINO → goes to protocol fee vault → Raydium LP
+        let fee        = compute_fee(amount_dpino);
+        let net_amount = amount_dpino.checked_sub(fee).ok_or(IdoError::MathOverflow)?;
 
-        // Collect protocol fee in a separate vault
-        let fee = compute_fee(amount_lamports);
+        // Transfer net DPINO: user → IDO vault
+        let cpi_net = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from:      ctx.accounts.user_dpino_ata.to_account_info(),
+                to:        ctx.accounts.ido_vault.to_account_info(),
+                authority: ctx.accounts.user.to_account_info(),
+            },
+        );
+        token::transfer(cpi_net, net_amount)?;
+
+        // Transfer fee DPINO: user → protocol fee vault (feeds DPINO/SOL LP)
         if fee > 0 {
-            let fee_cpi = anchor_lang::system_program::Transfer {
-                from: ctx.accounts.user.to_account_info(),
-                to:   ctx.accounts.protocol_fee_vault.to_account_info(),
-            };
-            anchor_lang::system_program::transfer(
-                CpiContext::new(ctx.accounts.system_program.to_account_info(), fee_cpi),
-                fee,
-            )?;
+            let cpi_fee = CpiContext::new(
+                ctx.accounts.token_program.to_account_info(),
+                Transfer {
+                    from:      ctx.accounts.user_dpino_ata.to_account_info(),
+                    to:        ctx.accounts.protocol_fee_vault.to_account_info(),
+                    authority: ctx.accounts.user.to_account_info(),
+                },
+            );
+            token::transfer(cpi_fee, fee)?;
         }
 
         // Update allocation state
@@ -161,22 +178,23 @@ pub mod dpino_ido {
             allocation.bump   = ctx.bumps.user_allocation;
             ido.participants  = ido.participants.saturating_add(1);
         }
-        allocation.amount_paid_lamports = new_total;
+        allocation.amount_paid_dpino = new_total;
 
-        ido.total_raised_lamports = ido.total_raised_lamports.saturating_add(amount_lamports);
+        // Track net raised (excluding fee)
+        ido.total_raised_dpino = ido.total_raised_dpino.saturating_add(net_amount);
 
         msg!(
-            "Participation: {} contributed {}L (+{}L fee). IDO total: {}L",
+            "IDO Participation: {} contributed {} DPINO (fee={} DPINO → LP). IDO total: {} DPINO",
             ctx.accounts.user.key(),
-            amount_lamports,
+            amount_dpino,
             fee,
-            ido.total_raised_lamports,
+            ido.total_raised_dpino,
         );
         Ok(())
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // User: Claim tokens after TGE
+    // User: Claim project tokens after TGE
     // ──────────────────────────────────────────────────────────────────────────
 
     pub fn claim_tokens(ctx: Context<ClaimTokens>) -> Result<()> {
@@ -187,23 +205,23 @@ pub mod dpino_ido {
         require!(ido.token_mint.is_some(),   IdoError::TokenMintNotSet);
         require!(!allocation.tokens_claimed, IdoError::AlreadyClaimed);
         require!(
-            ido.total_raised_lamports >= ido.soft_cap_lamports,
+            ido.total_raised_dpino >= ido.soft_cap_dpino,
             IdoError::SoftCapNotMet
         );
 
-        // Calculate tokens owed: paid_lamports / token_price_lamports
-        let tokens_owed = (allocation.amount_paid_lamports as u128)
+        // Tokens owed: paid_dpino / token_price_dpino × project_token_decimals
+        let tokens_owed = (allocation.amount_paid_dpino as u128)
             .checked_mul(10u128.pow(ctx.accounts.token_mint.decimals as u32))
-            .and_then(|n| n.checked_div(ido.token_price_lamports as u128))
+            .and_then(|n| n.checked_div(ido.token_price_dpino as u128))
             .ok_or(IdoError::MathOverflow)? as u64;
 
         require!(tokens_owed > 0, IdoError::NoTokensToClaim);
 
-        // Transfer tokens from distribution vault → user via PDA signer
-        let ido_key = ido.key();
+        // Transfer project tokens from distribution vault → user via PDA signer
+        let project_name_bytes = ido.project_name.as_bytes().to_vec();
         let signer_seeds: &[&[&[u8]]] = &[&[
             b"ido_pool",
-            ido_key.as_ref(),
+            project_name_bytes.as_ref(),
             &[ido.bump],
         ]];
 
@@ -220,66 +238,91 @@ pub mod dpino_ido {
 
         allocation.tokens_claimed = true;
 
-        msg!("Claimed {} tokens for {}", tokens_owed, ctx.accounts.user.key());
+        msg!("Claimed {} project tokens for {}", tokens_owed, ctx.accounts.user.key());
         Ok(())
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // User: Refund (if soft cap not met after end)
+    // User: Refund $DPINO if soft cap not met
     // ──────────────────────────────────────────────────────────────────────────
 
     pub fn refund(ctx: Context<Refund>) -> Result<()> {
         let ido        = &ctx.accounts.ido_pool;
         let allocation = &mut ctx.accounts.user_allocation;
 
-        require!(ido.is_finalized,  IdoError::NotFinalized);
+        require!(ido.is_finalized,   IdoError::NotFinalized);
         require!(!allocation.refunded, IdoError::AlreadyRefunded);
         require!(
-            ido.total_raised_lamports < ido.soft_cap_lamports,
+            ido.total_raised_dpino < ido.soft_cap_dpino,
             IdoError::SoftCapMet
         );
 
-        let refund_amount = allocation.amount_paid_lamports;
+        let refund_amount = allocation.amount_paid_dpino;
         require!(refund_amount > 0, IdoError::NothingToRefund);
 
-        // Return SOL from IDO vault → user via PDA signer
-        **ctx.accounts.ido_vault.to_account_info().try_borrow_mut_lamports()? =
-            ctx.accounts.ido_vault.to_account_info().lamports()
-                .checked_sub(refund_amount)
-                .ok_or(IdoError::MathOverflow)?;
+        // Transfer DPINO from IDO vault → user via PDA signer
+        let project_name_bytes = ido.project_name.as_bytes().to_vec();
+        let signer_seeds: &[&[&[u8]]] = &[&[
+            b"ido_vault",
+            project_name_bytes.as_ref(),
+            &[ctx.bumps.ido_vault],
+        ]];
 
-        **ctx.accounts.user.to_account_info().try_borrow_mut_lamports()? =
-            ctx.accounts.user.to_account_info().lamports()
-                .checked_add(refund_amount)
-                .ok_or(IdoError::MathOverflow)?;
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from:      ctx.accounts.ido_vault.to_account_info(),
+                to:        ctx.accounts.user_dpino_ata.to_account_info(),
+                authority: ctx.accounts.ido_vault.to_account_info(),
+            },
+            signer_seeds,
+        );
+        token::transfer(cpi_ctx, refund_amount)?;
 
         allocation.refunded = true;
 
-        msg!("Refunded {}L to {}", refund_amount, ctx.accounts.user.key());
+        msg!("Refunded {} DPINO to {}", refund_amount, ctx.accounts.user.key());
         Ok(())
     }
 
     // ──────────────────────────────────────────────────────────────────────────
-    // Admin: Withdraw raised SOL
+    // Admin: Withdraw raised $DPINO (routes to DPINO/SOL LP on Raydium)
     // ──────────────────────────────────────────────────────────────────────────
 
     pub fn withdraw_funds(ctx: Context<WithdrawFunds>) -> Result<()> {
         let ido = &ctx.accounts.ido_pool;
         require!(ido.is_finalized, IdoError::NotFinalized);
         require!(
-            ido.total_raised_lamports >= ido.soft_cap_lamports,
+            ido.total_raised_dpino >= ido.soft_cap_dpino,
             IdoError::SoftCapNotMet
         );
 
-        let vault_balance = ctx.accounts.ido_vault.to_account_info().lamports();
+        let vault_balance = ctx.accounts.ido_vault.amount;
 
-        **ctx.accounts.ido_vault.to_account_info().try_borrow_mut_lamports()? = 0;
-        **ctx.accounts.authority.to_account_info().try_borrow_mut_lamports()? =
-            ctx.accounts.authority.to_account_info().lamports()
-                .checked_add(vault_balance)
-                .ok_or(IdoError::MathOverflow)?;
+        // Transfer all DPINO from vault → authority (admin routes to Raydium LP)
+        let project_name_bytes = ido.project_name.as_bytes().to_vec();
+        let signer_seeds: &[&[&[u8]]] = &[&[
+            b"ido_vault",
+            project_name_bytes.as_ref(),
+            &[ctx.bumps.ido_vault],
+        ]];
 
-        msg!("Withdrew {}L from IDO '{}'", vault_balance, ido.project_name);
+        let cpi_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from:      ctx.accounts.ido_vault.to_account_info(),
+                to:        ctx.accounts.authority_dpino_ata.to_account_info(),
+                authority: ctx.accounts.ido_vault.to_account_info(),
+            },
+            signer_seeds,
+        );
+        token::transfer(cpi_ctx, vault_balance)?;
+
+        msg!(
+            "Withdrew {} DPINO from IDO '{}'. Route to DPINO/SOL LP on Raydium.",
+            vault_balance,
+            ido.project_name
+        );
         Ok(())
     }
 }
@@ -298,27 +341,30 @@ fn compute_fee(amount: u64) -> u64 {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct IdoParams {
-    pub project_name:              String,
-    pub token_price_lamports:      u64,  // SOL lamports per 1 token
-    pub hard_cap_lamports:         u64,  // maximum total raise in lamports
-    pub soft_cap_lamports:         u64,  // minimum to consider IDO successful
-    pub start_time:                i64,  // unix timestamp
-    pub end_time:                  i64,  // unix timestamp
-    pub min_allocation_lamports:   u64,
-    pub max_allocation_lamports:   u64,
-    pub min_tier_required:         u8,   // 0=none 1=soldier 2=general 3=dark_lord
+    pub project_name:            String,
+    pub token_price_dpino:       u64,  // DPINO base units per 1 project token
+    pub hard_cap_dpino:          u64,  // max total DPINO to raise
+    pub soft_cap_dpino:          u64,  // min DPINO for successful IDO
+    pub start_time:              i64,  // unix timestamp
+    pub end_time:                i64,  // unix timestamp
+    pub min_allocation_dpino:    u64,  // min DPINO per participant
+    pub max_allocation_dpino:    u64,  // max DPINO per participant
+    pub min_tier_required:       u8,   // 0=none 1=soldier 2=general 3=dark_lord
 }
 
 impl IdoParams {
     fn validate(&self) -> Result<()> {
-        require!(!self.project_name.is_empty(),                   IdoError::InvalidParams);
-        require!(self.project_name.len() <= MAX_NAME_LEN,         IdoError::InvalidParams);
-        require!(self.token_price_lamports > 0,                   IdoError::InvalidParams);
-        require!(self.hard_cap_lamports > 0,                      IdoError::InvalidParams);
-        require!(self.soft_cap_lamports <= self.hard_cap_lamports, IdoError::InvalidParams);
+        require!(!self.project_name.is_empty(),                    IdoError::InvalidParams);
+        require!(self.project_name.len() <= MAX_NAME_LEN,          IdoError::InvalidParams);
+        require!(self.token_price_dpino > 0,                       IdoError::InvalidParams);
+        require!(self.hard_cap_dpino > 0,                          IdoError::InvalidParams);
+        require!(self.soft_cap_dpino <= self.hard_cap_dpino,       IdoError::InvalidParams);
         require!(self.end_time > self.start_time,                  IdoError::InvalidParams);
-        require!(self.min_allocation_lamports > 0,                IdoError::InvalidParams);
-        require!(self.max_allocation_lamports >= self.min_allocation_lamports, IdoError::InvalidParams);
+        require!(self.min_allocation_dpino > 0,                    IdoError::InvalidParams);
+        require!(
+            self.max_allocation_dpino >= self.min_allocation_dpino,
+            IdoError::InvalidParams
+        );
         Ok(())
     }
 }
@@ -339,30 +385,39 @@ pub struct InitializeIdo<'info> {
     )]
     pub ido_pool: Account<'info, IdoPool>,
 
-    /// SOL vault — holds contributed funds
+    /// The $DPINO mint — verified to be the real DPINO token
+    #[account(
+        constraint = dpino_mint.key().to_string() == DPINO_MINT @ IdoError::InvalidMint
+    )]
+    pub dpino_mint: Account<'info, Mint>,
+
+    /// DPINO vault — holds contributed DPINO tokens
     #[account(
         init,
         payer = authority,
-        space = 8,
+        token::mint = dpino_mint,
+        token::authority = ido_pool,
         seeds = [b"ido_vault", params.project_name.as_bytes()],
         bump
     )]
-    pub ido_vault: SystemAccount<'info>,
+    pub ido_vault: Account<'info, TokenAccount>,
 
-    /// Protocol fee vault — 0.5% goes here, flows to DPINO buyback/LP
+    /// Protocol fee vault — 0.5% DPINO goes here, routed to DPINO/SOL LP
     #[account(
         init,
         payer = authority,
-        space = 8,
+        token::mint = dpino_mint,
+        token::authority = ido_pool,
         seeds = [b"protocol_fee_vault"],
         bump
     )]
-    pub protocol_fee_vault: SystemAccount<'info>,
+    pub protocol_fee_vault: Account<'info, TokenAccount>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,
+    pub token_program:  Program<'info, Token>,
     pub rent:           Sysvar<'info, Rent>,
 }
 
@@ -372,8 +427,7 @@ pub struct AdminIdo<'info> {
         mut,
         has_one = authority @ IdoError::Unauthorized
     )]
-    pub ido_pool: Account<'info, IdoPool>,
-
+    pub ido_pool:  Account<'info, IdoPool>,
     pub token_mint: Account<'info, Mint>,
     pub authority:  Signer<'info>,
 }
@@ -406,34 +460,41 @@ pub struct Participate<'info> {
     )]
     pub user_allocation: Account<'info, UserAllocation>,
 
-    /// IDO SOL vault
+    /// User's $DPINO associated token account (source of funds)
+    #[account(
+        mut,
+        constraint = user_dpino_ata.mint == ido_pool.dpino_mint @ IdoError::InvalidMint,
+        constraint = user_dpino_ata.owner == user.key()          @ IdoError::Unauthorized
+    )]
+    pub user_dpino_ata: Account<'info, TokenAccount>,
+
+    /// IDO DPINO vault — receives net contribution
     #[account(
         mut,
         seeds = [b"ido_vault", ido_pool.project_name.as_bytes()],
         bump
     )]
-    pub ido_vault: SystemAccount<'info>,
+    pub ido_vault: Account<'info, TokenAccount>,
 
-    /// Protocol fee vault
+    /// Protocol fee vault — receives 0.5% in DPINO (→ Raydium LP)
     #[account(
         mut,
         seeds = [b"protocol_fee_vault"],
         bump
     )]
-    pub protocol_fee_vault: SystemAccount<'info>,
+    pub protocol_fee_vault: Account<'info, TokenAccount>,
 
     /// Optional: user's DPINO staking position for tier gating.
-    /// Pass a dummy account (or None via remaining_accounts) if no gating.
     pub staking_position: Option<Account<'info, StakingPositionExternal>>,
 
     #[account(mut)]
     pub user: Signer<'info>,
 
     pub system_program: Program<'info, System>,
+    pub token_program:  Program<'info, Token>,
 }
 
-/// We only need the `tier` field from the staking program's StakingPosition.
-/// This is a zero-copy read — we deserialize just the fields we need.
+/// Cross-program read of the staking position (only tier field needed).
 #[account]
 pub struct StakingPositionExternal {
     pub owner:                 Pubkey,
@@ -463,7 +524,7 @@ pub struct ClaimTokens<'info> {
     )]
     pub user_allocation: Account<'info, UserAllocation>,
 
-    /// Token mint (must match ido_pool.token_mint)
+    /// Project token mint (must match ido_pool.token_mint)
     #[account(
         constraint = Some(token_mint.key()) == ido_pool.token_mint @ IdoError::TokenMintNotSet
     )]
@@ -477,7 +538,7 @@ pub struct ClaimTokens<'info> {
     )]
     pub distribution_vault: Account<'info, TokenAccount>,
 
-    /// User's token account to receive purchased tokens
+    /// User's project token account to receive purchased tokens
     #[account(
         mut,
         constraint = user_token_account.mint  == token_mint.key() @ IdoError::InvalidMint,
@@ -505,17 +566,26 @@ pub struct Refund<'info> {
     )]
     pub user_allocation: Account<'info, UserAllocation>,
 
+    /// IDO vault (sends DPINO back to user)
     #[account(
         mut,
         seeds = [b"ido_vault", ido_pool.project_name.as_bytes()],
         bump
     )]
-    pub ido_vault: SystemAccount<'info>,
+    pub ido_vault: Account<'info, TokenAccount>,
+
+    /// User's DPINO ATA to receive refund
+    #[account(
+        mut,
+        constraint = user_dpino_ata.mint == ido_pool.dpino_mint @ IdoError::InvalidMint,
+        constraint = user_dpino_ata.owner == user.key()          @ IdoError::Unauthorized
+    )]
+    pub user_dpino_ata: Account<'info, TokenAccount>,
 
     #[account(mut)]
     pub user: Signer<'info>,
 
-    pub system_program: Program<'info, System>,
+    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -527,15 +597,26 @@ pub struct WithdrawFunds<'info> {
     )]
     pub ido_pool: Account<'info, IdoPool>,
 
+    /// IDO vault (sends DPINO to authority → Raydium LP)
     #[account(
         mut,
         seeds = [b"ido_vault", ido_pool.project_name.as_bytes()],
         bump
     )]
-    pub ido_vault: SystemAccount<'info>,
+    pub ido_vault: Account<'info, TokenAccount>,
+
+    /// Authority's DPINO ATA to receive raised funds
+    #[account(
+        mut,
+        constraint = authority_dpino_ata.mint == ido_pool.dpino_mint @ IdoError::InvalidMint,
+        constraint = authority_dpino_ata.owner == authority.key()     @ IdoError::Unauthorized
+    )]
+    pub authority_dpino_ata: Account<'info, TokenAccount>,
 
     #[account(mut)]
     pub authority: Signer<'info>,
+
+    pub token_program: Program<'info, Token>,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -544,57 +625,59 @@ pub struct WithdrawFunds<'info> {
 
 #[account]
 pub struct IdoPool {
-    pub authority:                Pubkey,        // 32
-    pub project_name:             String,        // 4 + 64
-    pub token_price_lamports:     u64,           // 8
-    pub hard_cap_lamports:        u64,           // 8
-    pub soft_cap_lamports:        u64,           // 8
-    pub start_time:               i64,           // 8
-    pub end_time:                 i64,           // 8
-    pub min_allocation_lamports:  u64,           // 8
-    pub max_allocation_lamports:  u64,           // 8
-    pub min_tier_required:        u8,            // 1
-    pub total_raised_lamports:    u64,           // 8
-    pub participants:             u32,           // 4
-    pub token_mint:               Option<Pubkey>,// 1 + 32
-    pub is_finalized:             bool,          // 1
-    pub tokens_distributed:       bool,          // 1
-    pub bump:                     u8,            // 1
+    pub authority:              Pubkey,   // 32
+    pub dpino_mint:             Pubkey,   // 32  — $DPINO token mint
+    pub project_name:           String,   // 4 + 64
+    pub token_price_dpino:      u64,      // 8   — DPINO per 1 project token (base units)
+    pub hard_cap_dpino:         u64,      // 8   — max DPINO to raise
+    pub soft_cap_dpino:         u64,      // 8   — min DPINO for success
+    pub start_time:             i64,      // 8
+    pub end_time:               i64,      // 8
+    pub min_allocation_dpino:   u64,      // 8
+    pub max_allocation_dpino:   u64,      // 8
+    pub min_tier_required:      u8,       // 1   — 0=none 1=soldier 2=general 3=dark_lord
+    pub total_raised_dpino:     u64,      // 8   — running total (net of fees)
+    pub participants:           u32,      // 4
+    pub token_mint:             Option<Pubkey>, // 33  — project token mint (set after TGE)
+    pub is_finalized:           bool,     // 1
+    pub tokens_distributed:     bool,     // 1
+    pub bump:                   u8,       // 1
 }
 
 impl IdoPool {
     pub const LEN: usize = 8   // discriminator
         + 32               // authority
-        + 4 + 64           // project_name (String)
-        + 8                // token_price_lamports
-        + 8                // hard_cap_lamports
-        + 8                // soft_cap_lamports
+        + 32               // dpino_mint
+        + 4 + 64           // project_name
+        + 8                // token_price_dpino
+        + 8                // hard_cap_dpino
+        + 8                // soft_cap_dpino
         + 8                // start_time
         + 8                // end_time
-        + 8                // min_allocation_lamports
-        + 8                // max_allocation_lamports
+        + 8                // min_allocation_dpino
+        + 8                // max_allocation_dpino
         + 1                // min_tier_required
-        + 8                // total_raised_lamports
+        + 8                // total_raised_dpino
         + 4                // participants
         + 1 + 32           // token_mint (Option<Pubkey>)
         + 1                // is_finalized
         + 1                // tokens_distributed
         + 1                // bump
-        + 64;              // headroom
+        + 64;              // padding
 }
 
 #[account]
 pub struct UserAllocation {
-    pub owner:                  Pubkey,  // 32
-    pub ido:                    Pubkey,  // 32
-    pub amount_paid_lamports:   u64,     // 8
-    pub tokens_claimed:         bool,    // 1
-    pub refunded:               bool,    // 1
-    pub bump:                   u8,      // 1
+    pub owner:               Pubkey,  // 32
+    pub ido:                 Pubkey,  // 32
+    pub amount_paid_dpino:   u64,     // 8   — DPINO contributed (net of fee)
+    pub tokens_claimed:      bool,    // 1
+    pub refunded:            bool,    // 1
+    pub bump:                u8,      // 1
 }
 
 impl UserAllocation {
-    pub const LEN: usize = 8 + 32 + 32 + 8 + 1 + 1 + 1 + 32; // +32 headroom
+    pub const LEN: usize = 8 + 32 + 32 + 8 + 1 + 1 + 1 + 32; // +32 padding
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -605,42 +688,42 @@ impl UserAllocation {
 pub enum IdoError {
     #[msg("IDO has not started yet")]
     IdoNotStarted,
-    #[msg("IDO has ended")]
+    #[msg("IDO has already ended")]
     IdoEnded,
     #[msg("IDO is still active — cannot finalize yet")]
     IdoStillActive,
     #[msg("IDO has already been finalized")]
     AlreadyFinalized,
-    #[msg("IDO is not yet finalized")]
+    #[msg("IDO has not been finalized yet")]
     NotFinalized,
-    #[msg("Hard cap would be exceeded")]
+    #[msg("Hard cap exceeded")]
     HardCapExceeded,
-    #[msg("Amount is below the minimum allocation")]
+    #[msg("Amount below minimum allocation")]
     BelowMinAllocation,
-    #[msg("Amount exceeds the maximum allocation")]
+    #[msg("Amount exceeds maximum allocation")]
     ExceedsMaxAllocation,
-    #[msg("Your DPINO staking tier is too low to participate in this IDO")]
+    #[msg("Insufficient staking tier for this IDO")]
     InsufficientTier,
-    #[msg("Soft cap has not been met — use refund instead")]
-    SoftCapNotMet,
-    #[msg("Soft cap was met — refunds are not available")]
-    SoftCapMet,
     #[msg("Tokens have already been claimed")]
     AlreadyClaimed,
-    #[msg("Refund has already been processed")]
+    #[msg("Already refunded")]
     AlreadyRefunded,
+    #[msg("Soft cap was met — no refund available")]
+    SoftCapMet,
+    #[msg("Soft cap not met — cannot finalize or claim")]
+    SoftCapNotMet,
+    #[msg("No tokens to claim")]
+    NoTokensToClaim,
     #[msg("Nothing to refund")]
     NothingToRefund,
-    #[msg("Token mint has not been set yet")]
+    #[msg("Token mint not set yet")]
     TokenMintNotSet,
-    #[msg("No tokens available to claim")]
-    NoTokensToClaim,
-    #[msg("Token mint mismatch")]
+    #[msg("Invalid mint — expected $DPINO")]
     InvalidMint,
-    #[msg("Invalid IDO parameters")]
-    InvalidParams,
-    #[msg("Math overflow")]
-    MathOverflow,
     #[msg("Unauthorized")]
     Unauthorized,
+    #[msg("Math overflow")]
+    MathOverflow,
+    #[msg("Invalid parameters")]
+    InvalidParams,
 }

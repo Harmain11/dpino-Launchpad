@@ -8,7 +8,8 @@
 
 export interface PlatformStats {
   totalProjectsLaunched: number;
-  totalRaisedUsd: number;
+  /** Total $DPINO raised across all IDOs */
+  totalRaisedDpino: number;
   totalStakers: number;
   totalDpinoStaked: number;
   activeLaunches: number;

@@ -144,7 +144,7 @@ export const CreateStakingPositionBody = zod.object({
  */
 export const GetPlatformStatsResponse = zod.object({
   totalProjectsLaunched: zod.number(),
-  totalRaisedUsd: zod.number(),
+  totalRaisedDpino: zod.number(),
   totalStakers: zod.number(),
   totalDpinoStaked: zod.number(),
   activeLaunches: zod.number(),

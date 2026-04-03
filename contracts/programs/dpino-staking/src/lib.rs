@@ -10,10 +10,10 @@ declare_id!("DPStak1ngXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
 /// $DPINO token mint on mainnet
 pub const DPINO_MINT: &str = "4fwCUiZ8qaddK3WFLXazXRtpYpHc39iYLnEfF7KjmoEy";
 
-/// Tier thresholds (in raw token units, 6 decimals)
-pub const SOLDIER_THRESHOLD:   u64 = 100_000_000_000;   // 100K  DPINO
-pub const GENERAL_THRESHOLD:   u64 = 500_000_000_000;   // 500K  DPINO
-pub const DARK_LORD_THRESHOLD: u64 = 1_000_000_000_000; // 1M    DPINO
+/// Tier thresholds (in raw token units, 9 decimals — $DPINO has 9 decimals)
+pub const SOLDIER_THRESHOLD:   u64 = 100_000_000_000_000;   // 100K  DPINO × 10^9
+pub const GENERAL_THRESHOLD:   u64 = 500_000_000_000_000;   // 500K  DPINO × 10^9
+pub const DARK_LORD_THRESHOLD: u64 = 1_000_000_000_000_000; // 1M    DPINO × 10^9
 
 /// Default unstake cooldown: 7 days in seconds
 pub const DEFAULT_COOLDOWN_SECONDS: i64 = 7 * 24 * 60 * 60;
