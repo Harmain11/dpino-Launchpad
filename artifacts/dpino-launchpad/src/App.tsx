@@ -14,6 +14,7 @@ import Apply from "@/pages/apply";
 import Admin from "@/pages/admin";
 import SignInPage from "@/pages/sign-in";
 import SignUpPage from "@/pages/sign-up";
+import SsoCallback from "@/pages/sso-callback";
 import NotFound from "@/pages/not-found";
 
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -60,19 +61,29 @@ function ClerkQueryClientCacheInvalidator() {
 
 function Router() {
   return (
-    <Layout>
-      <Switch>
-        <Route path="/" component={Home} />
-        <Route path="/projects" component={Projects} />
-        <Route path="/projects/:id" component={ProjectDetail} />
-        <Route path="/stake" component={Stake} />
-        <Route path="/apply" component={Apply} />
-        <Route path="/admin" component={Admin} />
-        <Route path="/sign-in/*?" component={SignInPage} />
-        <Route path="/sign-up/*?" component={SignUpPage} />
-        <Route component={NotFound} />
-      </Switch>
-    </Layout>
+    <Switch>
+      {/* Auth pages — no nav/footer wrapper */}
+      <Route path="/sign-in/*?" component={SignInPage} />
+      <Route path="/sign-up/*?" component={SignUpPage} />
+      <Route path="/sso-callback" component={SsoCallback} />
+
+      {/* Main app — with nav/footer */}
+      <Route>
+        {() => (
+          <Layout>
+            <Switch>
+              <Route path="/" component={Home} />
+              <Route path="/projects" component={Projects} />
+              <Route path="/projects/:id" component={ProjectDetail} />
+              <Route path="/stake" component={Stake} />
+              <Route path="/apply" component={Apply} />
+              <Route path="/admin" component={Admin} />
+              <Route component={NotFound} />
+            </Switch>
+          </Layout>
+        )}
+      </Route>
+    </Switch>
   );
 }
 
