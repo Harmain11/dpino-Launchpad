@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Menu, X, ChevronDown, Copy, LogOut, Wallet, User } from "lucide-react";
+import { Menu, X, ChevronDown, Copy, LogOut, Wallet, User, LayoutDashboard } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useDpinoBalance } from "@/hooks/useDpinoBalance";
 import { useDpinoPrice } from "@/hooks/useDpinoPrice";
@@ -72,12 +72,18 @@ export function Navbar() {
     setProfileOpen(false);
   };
 
-  const links = [
+  const publicLinks = [
     { href: "/", label: "Home" },
+  ];
+
+  const authLinks = [
+    { href: "/dashboard", label: "Dashboard" },
     { href: "/projects", label: "Launchpad" },
     { href: "/stake", label: "Stake" },
     { href: "/apply", label: "Apply" },
   ];
+
+  const links = (isUserLoaded && user) ? authLinks : publicLinks;
 
   return (
     <>
@@ -164,6 +170,14 @@ export function Navbar() {
                           <p className="text-sm text-foreground font-medium truncate">{user.primaryEmailAddress?.emailAddress}</p>
                         </div>
                         <div className="p-2">
+                          <Link
+                            href="/dashboard"
+                            onClick={() => setAuthMenuOpen(false)}
+                            className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm hover:bg-white/5 rounded-sm transition-colors"
+                          >
+                            <LayoutDashboard size={14} className="text-primary" />
+                            Dashboard
+                          </Link>
                           <button
                             onClick={() => { signOut(); setAuthMenuOpen(false); }}
                             className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-400/10 rounded-sm transition-colors"

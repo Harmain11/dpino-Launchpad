@@ -11,11 +11,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useListProjects } from "@workspace/api-client-react";
+import { useListProjects, useListStakingPositions } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Pencil, Trash2, Plus, RefreshCw, ExternalLink, AlertCircle } from "lucide-react";
-import { format } from "date-fns";
+import { Pencil, Trash2, Plus, RefreshCw, ExternalLink, AlertCircle, Users, Lock, Unlock, Shield, Zap, Crown } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 const API_BASE = `${BASE}/api`;
@@ -213,9 +213,20 @@ function ProjectForm({ initial, onSave, onCancel }: {
   );
 }
 
+function formatDpinoLong(n: number) {
+  return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+function TierChip({ tier }: { tier: string }) {
+  if (tier === "DARK LORD") return <Badge className="text-[9px] bg-yellow-500/10 text-yellow-300 border-yellow-500/30 font-bold"><Crown className="w-2.5 h-2.5 mr-1" />{tier}</Badge>;
+  if (tier === "GENERAL") return <Badge className="text-[9px] bg-violet-500/10 text-violet-300 border-violet-500/30 font-bold"><Zap className="w-2.5 h-2.5 mr-1" />{tier}</Badge>;
+  return <Badge className="text-[9px] bg-amber-500/10 text-amber-300 border-amber-500/30 font-bold"><Shield className="w-2.5 h-2.5 mr-1" />{tier}</Badge>;
+}
+
 export default function Admin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<"projects" | "stakers">("projects");
   const [addOpen, setAddOpen] = useState(false);
   const [editProject, setEditProject] = useState<any | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -225,10 +236,21 @@ export default function Admin() {
     { query: { queryKey: ["/api/projects", "all"] } }
   );
 
+  const { data: allPositions, isLoading: posLoading, refetch: refetchPos } = useListStakingPositions(
+    {},
+    { query: { queryKey: ["/api/staking/positions", "all"] } }
+  );
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/projects"] });
     refetch();
   };
+
+  const totalStaked = allPositions?.reduce((s, p) => s + p.amountStaked, 0) ?? 0;
+  const tierCounts = allPositions?.reduce((acc, p) => {
+    acc[p.tier] = (acc[p.tier] ?? 0) + 1;
+    return acc;
+  }, {} as Record<string, number>) ?? {};
 
   async function createProject(values: ProjectFormValues) {
     const res = await fetch(`${API_BASE}/projects`, {
@@ -303,33 +325,37 @@ export default function Admin() {
       <div className="container px-4">
 
         {/* Header */}
-        <div className="flex items-center justify-between mb-10">
+        <div className="flex items-center justify-between mb-8">
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-widest mb-1">Restricted — Internal Use Only</p>
             <h1 className="text-4xl font-black uppercase tracking-tighter text-gradient-gold">Admin Panel</h1>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={() => refetch()} className="border-white/20 rounded-sm h-10 uppercase tracking-widest text-xs">
+            <Button variant="outline" onClick={() => { refetch(); refetchPos(); }} className="border-white/20 rounded-sm h-10 uppercase tracking-widest text-xs">
               <RefreshCw className="w-3 h-3 mr-2" /> Refresh
             </Button>
-            <Button onClick={() => setAddOpen(true)} className="bg-primary text-black font-bold uppercase tracking-widest rounded-sm h-10">
-              <Plus className="w-4 h-4 mr-2" /> Add Project
-            </Button>
+            {activeTab === "projects" && (
+              <Button onClick={() => setAddOpen(true)} className="bg-primary text-black font-bold uppercase tracking-widest rounded-sm h-10">
+                <Plus className="w-4 h-4 mr-2" /> Add Project
+              </Button>
+            )}
           </div>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-          {[
-            { label: "Total Projects", value: projects?.length ?? 0 },
-            { label: "Live", value: projects?.filter(p => p.status === "live").length ?? 0 },
-            { label: "Upcoming", value: projects?.filter(p => p.status === "upcoming").length ?? 0 },
-            { label: "Ended", value: projects?.filter(p => p.status === "ended").length ?? 0 },
-          ].map(s => (
-            <div key={s.label} className="bg-card/40 border border-white/5 rounded-sm p-4 text-center">
-              <p className="text-3xl font-black font-mono text-foreground">{s.value}</p>
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mt-1">{s.label}</p>
-            </div>
+        {/* Tabs */}
+        <div className="flex gap-1 mb-8 border-b border-white/10 pb-0">
+          {(["projects", "stakers"] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-5 py-2.5 text-xs font-bold uppercase tracking-widest rounded-t-sm border-b-2 transition-all ${
+                activeTab === tab
+                  ? "border-primary text-primary bg-primary/5"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-white/5"
+              }`}
+            >
+              {tab === "projects" ? `Projects (${projects?.length ?? 0})` : `Stakers (${allPositions?.length ?? 0})`}
+            </button>
           ))}
         </div>
 
@@ -341,87 +367,195 @@ export default function Admin() {
           </p>
         </div>
 
-        {/* Projects Table */}
-        {isLoading ? (
-          <p className="text-center text-muted-foreground py-20">Loading projects...</p>
-        ) : projects?.length === 0 ? (
-          <div className="text-center py-24 border border-white/5 rounded-sm bg-black/20">
-            <p className="text-xl font-bold uppercase tracking-widest mb-2">No Projects</p>
-            <p className="text-muted-foreground mb-6">The database is empty. Add the first real project.</p>
-            <Button onClick={() => setAddOpen(true)} className="bg-primary text-black font-bold uppercase tracking-widest rounded-sm">
-              <Plus className="w-4 h-4 mr-2" /> Add First Project
-            </Button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {projects?.map((project) => (
-              <Card key={project.id} className="bg-card/40 border-white/5 rounded-sm">
-                <CardContent className="p-5">
-                  <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap mb-1">
-                        <h3 className="font-black uppercase tracking-tight text-lg">{project.name}</h3>
-                        <span className="font-mono text-xs text-muted-foreground">${project.ticker}</span>
-                        <Badge className={`text-[10px] uppercase tracking-widest border ${statusColors[project.status]}`}>
-                          {project.status}
-                        </Badge>
-                        <Badge variant="outline" className="text-[10px] border-white/10 text-muted-foreground">
-                          {project.category}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground line-clamp-1 mb-2">{project.description}</p>
-                      <div className="flex flex-wrap gap-4 text-xs font-mono text-muted-foreground">
-                        <span>Cap: <span className="text-primary">{formatDpino(project.totalRaise)} DPINO</span></span>
-                        <span>Raised: <span className="text-foreground">{formatDpino(project.raisedAmount)} DPINO</span></span>
-                        <span>Price: <span className="text-foreground">{formatDpino(project.tokenPrice)} DPINO</span></span>
-                        <span>Participants: <span className="text-foreground">{project.participants}</span></span>
-                        {project.tokenAddress && (
-                          <span className="text-green-400">Token: {project.tokenAddress.slice(0, 8)}...</span>
-                        )}
-                      </div>
-                    </div>
+        {/* ══ PROJECTS TAB ══════════════════════════════════════════════════════ */}
+        {activeTab === "projects" && (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              {[
+                { label: "Total Projects", value: projects?.length ?? 0 },
+                { label: "Live", value: projects?.filter(p => p.status === "live").length ?? 0 },
+                { label: "Upcoming", value: projects?.filter(p => p.status === "upcoming").length ?? 0 },
+                { label: "Ended", value: projects?.filter(p => p.status === "ended").length ?? 0 },
+              ].map(s => (
+                <div key={s.label} className="bg-card/40 border border-white/5 rounded-sm p-4 text-center">
+                  <p className="text-3xl font-black font-mono text-foreground">{s.value}</p>
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground mt-1">{s.label}</p>
+                </div>
+              ))}
+            </div>
 
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                      {/* Status change buttons */}
-                      {project.status !== "upcoming" && (
-                        <Button size="sm" variant="outline" onClick={() => changeStatus(project.id, "upcoming")} className="h-8 text-[10px] border-violet-500/30 text-violet-400 hover:bg-violet-500/10 rounded-sm uppercase tracking-widest">
-                          → Upcoming
-                        </Button>
-                      )}
-                      {project.status !== "live" && (
-                        <Button size="sm" variant="outline" onClick={() => changeStatus(project.id, "live")} className="h-8 text-[10px] border-green-500/30 text-green-400 hover:bg-green-500/10 rounded-sm uppercase tracking-widest">
-                          → Live
-                        </Button>
-                      )}
-                      {project.status !== "ended" && (
-                        <Button size="sm" variant="outline" onClick={() => changeStatus(project.id, "ended")} className="h-8 text-[10px] border-white/20 text-muted-foreground hover:bg-white/5 rounded-sm uppercase tracking-widest">
-                          → End
-                        </Button>
-                      )}
+            {isLoading ? (
+              <p className="text-center text-muted-foreground py-20">Loading projects...</p>
+            ) : projects?.length === 0 ? (
+              <div className="text-center py-24 border border-white/5 rounded-sm bg-black/20">
+                <p className="text-xl font-bold uppercase tracking-widest mb-2">No Projects</p>
+                <p className="text-muted-foreground mb-6">The database is empty. Add the first real project.</p>
+                <Button onClick={() => setAddOpen(true)} className="bg-primary text-black font-bold uppercase tracking-widest rounded-sm">
+                  <Plus className="w-4 h-4 mr-2" /> Add First Project
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {projects?.map((project) => (
+                  <Card key={project.id} className="bg-card/40 border-white/5 rounded-sm">
+                    <CardContent className="p-5">
+                      <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 flex-wrap mb-1">
+                            <h3 className="font-black uppercase tracking-tight text-lg">{project.name}</h3>
+                            <span className="font-mono text-xs text-muted-foreground">${project.ticker}</span>
+                            <Badge className={`text-[10px] uppercase tracking-widest border ${statusColors[project.status]}`}>
+                              {project.status}
+                            </Badge>
+                            <Badge variant="outline" className="text-[10px] border-white/10 text-muted-foreground">
+                              {project.category}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground line-clamp-1 mb-2">{project.description}</p>
+                          <div className="flex flex-wrap gap-4 text-xs font-mono text-muted-foreground">
+                            <span>Cap: <span className="text-primary">{formatDpino(project.totalRaise)} DPINO</span></span>
+                            <span>Raised: <span className="text-foreground">{formatDpino(project.raisedAmount)} DPINO</span></span>
+                            <span>Price: <span className="text-foreground">{formatDpino(project.tokenPrice)} DPINO</span></span>
+                            <span>Participants: <span className="text-foreground">{project.participants}</span></span>
+                            {project.tokenAddress && (
+                              <span className="text-green-400">Token: {project.tokenAddress.slice(0, 8)}...</span>
+                            )}
+                          </div>
+                        </div>
 
-                      <Link href={`/projects/${project.id}`} target="_blank">
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-white/5">
-                          <ExternalLink className="w-3.5 h-3.5" />
-                        </Button>
-                      </Link>
-                      <Button size="sm" variant="ghost" onClick={() => setEditProject(project)} className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        disabled={deletingId === project.id}
-                        onClick={() => deleteProject(project.id, project.name)}
-                        className="h-8 w-8 p-0 hover:bg-red-500/10 hover:text-red-400"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                          {project.status !== "upcoming" && (
+                            <Button size="sm" variant="outline" onClick={() => changeStatus(project.id, "upcoming")} className="h-8 text-[10px] border-violet-500/30 text-violet-400 hover:bg-violet-500/10 rounded-sm uppercase tracking-widest">
+                              → Upcoming
+                            </Button>
+                          )}
+                          {project.status !== "live" && (
+                            <Button size="sm" variant="outline" onClick={() => changeStatus(project.id, "live")} className="h-8 text-[10px] border-green-500/30 text-green-400 hover:bg-green-500/10 rounded-sm uppercase tracking-widest">
+                              → Live
+                            </Button>
+                          )}
+                          {project.status !== "ended" && (
+                            <Button size="sm" variant="outline" onClick={() => changeStatus(project.id, "ended")} className="h-8 text-[10px] border-white/20 text-muted-foreground hover:bg-white/5 rounded-sm uppercase tracking-widest">
+                              → End
+                            </Button>
+                          )}
+                          <Link href={`/projects/${project.id}`} target="_blank">
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-white/5">
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </Button>
+                          </Link>
+                          <Button size="sm" variant="ghost" onClick={() => setEditProject(project)} className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={deletingId === project.id}
+                            onClick={() => deleteProject(project.id, project.name)}
+                            className="h-8 w-8 p-0 hover:bg-red-500/10 hover:text-red-400"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ══ STAKERS TAB ═══════════════════════════════════════════════════════ */}
+        {activeTab === "stakers" && (
+          <>
+            {/* Staker summary stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              {[
+                { label: "Total Stakers", value: allPositions?.length ?? 0 },
+                { label: "Total Staked", value: formatDpino(totalStaked) + " DPINO" },
+                { label: "DARK LORD", value: tierCounts["DARK LORD"] ?? 0 },
+                { label: "GENERAL", value: tierCounts["GENERAL"] ?? 0 },
+              ].map(s => (
+                <div key={s.label} className="bg-card/40 border border-white/5 rounded-sm p-4 text-center">
+                  <p className="text-2xl font-black font-mono text-foreground">{s.value}</p>
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground mt-1">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {posLoading ? (
+              <p className="text-center text-muted-foreground py-20">Loading staking positions...</p>
+            ) : !allPositions?.length ? (
+              <div className="text-center py-24 border border-white/5 rounded-sm bg-black/20">
+                <Users className="w-10 h-10 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-xl font-bold uppercase tracking-widest mb-2">No Stakers Yet</p>
+                <p className="text-muted-foreground">Nobody has staked $DPINO yet.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      {["Wallet", "Tier", "Staked (DPINO)", "Type", "Lock Period", "Lock Until", "Staked At"].map(h => (
+                        <th key={h} className="text-left py-2.5 px-3 text-[10px] uppercase tracking-widest text-muted-foreground font-medium whitespace-nowrap">
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allPositions.map((pos) => (
+                      <tr key={pos.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                        <td className="py-3 px-3">
+                          <a
+                            href={`https://solscan.io/account/${pos.walletAddress}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="font-mono text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                          >
+                            {pos.walletAddress.slice(0, 6)}...{pos.walletAddress.slice(-6)}
+                          </a>
+                        </td>
+                        <td className="py-3 px-3">
+                          <TierChip tier={pos.tier} />
+                        </td>
+                        <td className="py-3 px-3 font-mono text-xs font-bold text-primary">
+                          {formatDpinoLong(pos.amountStaked)}
+                        </td>
+                        <td className="py-3 px-3">
+                          {pos.stakingType === "fixed" ? (
+                            <Badge className="text-[9px] bg-primary/10 text-primary border-primary/30">
+                              <Lock className="w-2.5 h-2.5 mr-1" /> Fixed
+                            </Badge>
+                          ) : (
+                            <Badge className="text-[9px] bg-blue-500/10 text-blue-300 border-blue-500/30">
+                              <Unlock className="w-2.5 h-2.5 mr-1" /> Flexible
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="py-3 px-3 text-xs text-muted-foreground font-mono">
+                          {pos.lockDurationDays ? `${pos.lockDurationDays}d` : "—"}
+                        </td>
+                        <td className="py-3 px-3 text-xs text-muted-foreground font-mono whitespace-nowrap">
+                          {pos.lockUntil
+                            ? new Date(pos.lockUntil) > new Date()
+                              ? <span className="text-orange-400">{format(new Date(pos.lockUntil), "MMM d, yyyy")}</span>
+                              : <span className="text-green-400">Unlocked</span>
+                            : "—"
+                          }
+                        </td>
+                        <td className="py-3 px-3 text-xs text-muted-foreground whitespace-nowrap">
+                          {formatDistanceToNow(new Date(pos.stakedAt), { addSuffix: true })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </div>
 

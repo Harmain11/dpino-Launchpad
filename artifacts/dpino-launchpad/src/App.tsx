@@ -1,12 +1,13 @@
 import { useEffect, useRef } from "react";
-import { Switch, Route, useLocation, Router as WouterRouter } from "wouter";
+import { Switch, Route, useLocation, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
-import { ClerkProvider, useClerk } from "@clerk/react";
+import { ClerkProvider, useClerk, useUser } from "@clerk/react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Layout } from "@/components/layout/layout";
 import { SolanaWalletProvider } from "@/providers/SolanaWalletProvider";
 import Home from "@/pages/home";
+import Dashboard from "@/pages/dashboard";
 import Projects from "@/pages/projects";
 import ProjectDetail from "@/pages/project-detail";
 import Stake from "@/pages/stake";
@@ -59,12 +60,41 @@ function ClerkQueryClientCacheInvalidator() {
   return null;
 }
 
+// Redirects authenticated users away from sign-in/up to dashboard
+function GuestRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isLoaded, isSignedIn } = useUser();
+  if (!isLoaded) return null;
+  if (isSignedIn) return <Redirect to="/dashboard" />;
+  return <Component />;
+}
+
+// Protects routes — redirects to sign-in if not authenticated
+function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
+  const { isLoaded, isSignedIn } = useUser();
+  if (!isLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs text-muted-foreground uppercase tracking-widest">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+  if (!isSignedIn) return <Redirect to="/sign-in" />;
+  return <Component />;
+}
+
 function Router() {
   return (
     <Switch>
-      {/* Auth pages — no nav/footer wrapper */}
-      <Route path="/sign-in/*?" component={SignInPage} />
-      <Route path="/sign-up/*?" component={SignUpPage} />
+      {/* Auth pages — no nav/footer, redirect to dashboard if already signed in */}
+      <Route path="/sign-in/*?">
+        {() => <GuestRoute component={SignInPage} />}
+      </Route>
+      <Route path="/sign-up/*?">
+        {() => <GuestRoute component={SignUpPage} />}
+      </Route>
       <Route path="/sso-callback" component={SsoCallback} />
 
       {/* Main app — with nav/footer */}
@@ -72,12 +102,29 @@ function Router() {
         {() => (
           <Layout>
             <Switch>
+              {/* Public */}
               <Route path="/" component={Home} />
-              <Route path="/projects" component={Projects} />
-              <Route path="/projects/:id" component={ProjectDetail} />
-              <Route path="/stake" component={Stake} />
-              <Route path="/apply" component={Apply} />
+
+              {/* Protected — require sign-in */}
+              <Route path="/dashboard">
+                {() => <ProtectedRoute component={Dashboard} />}
+              </Route>
+              <Route path="/projects">
+                {() => <ProtectedRoute component={Projects} />}
+              </Route>
+              <Route path="/projects/:id">
+                {() => <ProtectedRoute component={ProjectDetail} />}
+              </Route>
+              <Route path="/stake">
+                {() => <ProtectedRoute component={Stake} />}
+              </Route>
+              <Route path="/apply">
+                {() => <ProtectedRoute component={Apply} />}
+              </Route>
+
+              {/* Admin — no auth gate (security by obscurity) */}
               <Route path="/admin" component={Admin} />
+
               <Route component={NotFound} />
             </Switch>
           </Layout>

@@ -19,14 +19,26 @@ Built as a pnpm workspace monorepo using TypeScript.
 ### API Field
 `totalRaisedDpino` (renamed from `totalRaisedUsd`) in `/api/stats/platform` response
 
-### Authentication (Clerk)
-Clerk auth is fully integrated. Routes: `/sign-in`, `/sign-up`.
+### Authentication & Routing (Clerk)
+Clerk auth is fully integrated with login-first flow. Routes: `/sign-in`, `/sign-up`.
 - Registration with email + password or Google OAuth
 - Email verification sent automatically on sign-up
 - Forgot password built into sign-in flow
-- Navbar shows "SIGN IN" + "REGISTER" when signed out; user email + "Sign Out" when signed in
+- **Protected routes**: `/dashboard`, `/projects`, `/projects/:id`, `/stake`, `/apply` all require sign-in (redirect to `/sign-in`)
+- **GuestRoute**: `/sign-in`, `/sign-up` redirect to `/dashboard` if already signed in
+- **Home page** (`/`) remains fully public
+- **Admin** (`/admin`) remains public (security by obscurity)
+- Navbar: when signed out shows "SIGN IN" + "REGISTER" + only "Home"; when signed in shows Dashboard/Launchpad/Stake/Apply links + user dropdown with Dashboard link + Sign Out
 - Env secrets: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`
 - API: `@clerk/express` middleware on server; `@clerk/react` on client
+
+### User Dashboard (`/dashboard`)
+Full dashboard for authenticated users:
+- Welcome header with username + tier badge
+- 4 stat cards: $DPINO Balance, Total Staked, Rewards Earned (live ticker), Allocation Power (multiplier)
+- Staking position panel: tier badge, mode (flexible/fixed), live earnings RAF ticker, lock countdown timer, claim buttons
+- Active launches preview with progress bars and tier-gating info
+- Sidebar: account info (avatar, email, wallet status), platform stats, tier guide with current tier highlighted
 
 ### Smart Contract Review (Anchor)
 Both contracts are logically correct and ready for local compilation:
