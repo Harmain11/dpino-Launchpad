@@ -213,6 +213,79 @@ function ProjectForm({ initial, onSave, onCancel }: {
   );
 }
 
+const ADMIN_SESSION_KEY = "dpino_admin_auth";
+const ADMIN_PASSWORD = "Uppercase1";
+
+function AdminPasswordGate({ onUnlock }: { onUnlock: () => void }) {
+  const [pw, setPw] = useState("");
+  const [error, setError] = useState(false);
+  const [show, setShow] = useState(false);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (pw === ADMIN_PASSWORD) {
+      sessionStorage.setItem(ADMIN_SESSION_KEY, "1");
+      onUnlock();
+    } else {
+      setError(true);
+      setPw("");
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-full max-w-sm">
+        <div className="text-center mb-8">
+          <div className="w-14 h-14 rounded-sm bg-primary/10 border border-primary/30 flex items-center justify-center mx-auto mb-4">
+            <Shield className="w-7 h-7 text-primary" />
+          </div>
+          <h1 className="text-2xl font-black uppercase tracking-widest mb-1">Admin Access</h1>
+          <p className="text-sm text-muted-foreground">Enter the admin password to continue.</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="relative">
+            <Input
+              type={show ? "text" : "password"}
+              value={pw}
+              onChange={e => { setPw(e.target.value); setError(false); }}
+              placeholder="Password"
+              autoFocus
+              className={`bg-black/50 border rounded-sm h-12 pr-12 text-center font-mono tracking-widest text-sm ${
+                error ? "border-red-500/60 focus-visible:ring-red-500" : "border-white/20 focus-visible:ring-primary"
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => setShow(!show)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {show ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              )}
+            </button>
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-400 text-center flex items-center justify-center gap-1.5">
+              <AlertCircle className="w-3 h-3" /> Incorrect password. Try again.
+            </p>
+          )}
+
+          <Button
+            type="submit"
+            className="w-full h-12 bg-primary text-black font-bold uppercase tracking-widest rounded-sm"
+          >
+            Unlock Admin
+          </Button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function formatDpinoLong(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
@@ -226,6 +299,7 @@ function TierChip({ tier }: { tier: string }) {
 export default function Admin() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [unlocked, setUnlocked] = useState(() => sessionStorage.getItem(ADMIN_SESSION_KEY) === "1");
   const [activeTab, setActiveTab] = useState<"projects" | "stakers">("projects");
   const [addOpen, setAddOpen] = useState(false);
   const [editProject, setEditProject] = useState<any | null>(null);
@@ -233,12 +307,12 @@ export default function Admin() {
 
   const { data: projects, isLoading, refetch } = useListProjects(
     { status: "all" },
-    { query: { queryKey: ["/api/projects", "all"] } }
+    { query: { queryKey: ["/api/projects", "all"], enabled: unlocked } }
   );
 
   const { data: allPositions, isLoading: posLoading, refetch: refetchPos } = useListStakingPositions(
     {},
-    { query: { queryKey: ["/api/staking/positions", "all"] } }
+    { query: { queryKey: ["/api/staking/positions", "all"], enabled: unlocked } }
   );
 
   const invalidate = () => {
@@ -251,6 +325,10 @@ export default function Admin() {
     acc[p.tier] = (acc[p.tier] ?? 0) + 1;
     return acc;
   }, {} as Record<string, number>) ?? {};
+
+  if (!unlocked) {
+    return <AdminPasswordGate onUnlock={() => setUnlocked(true)} />;
+  }
 
   async function createProject(values: ProjectFormValues) {
     const res = await fetch(`${API_BASE}/projects`, {
