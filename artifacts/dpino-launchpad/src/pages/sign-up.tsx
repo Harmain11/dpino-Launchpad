@@ -1,7 +1,24 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { SignUp } from "@clerk/react";
 
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+function useHideClerkDevBadge() {
+  useEffect(() => {
+    const hide = () => {
+      document.querySelectorAll("a, div, span, button").forEach((el) => {
+        const text = (el as HTMLElement).innerText?.trim();
+        if (text === "Development mode") {
+          (el as HTMLElement).style.setProperty("display", "none", "important");
+        }
+      });
+    };
+    const observer = new MutationObserver(hide);
+    observer.observe(document.body, { childList: true, subtree: true });
+    hide();
+    return () => observer.disconnect();
+  }, []);
+}
 
 const clerkAppearance = {
   variables: {
@@ -26,11 +43,13 @@ const clerkAppearance = {
     formFieldInput:
       "!bg-white/[0.04] !border-white/10 focus:!border-amber-500/50 !text-white !rounded-sm !h-12",
     formFieldLabel: "!text-zinc-400 !text-xs !uppercase !tracking-widest",
-    socialButtonsBlockButton:
-      "!border-white/15 !bg-white/[0.04] hover:!bg-white/[0.08] hover:!border-white/30 !text-white !rounded-sm !transition-all",
-    socialButtonsBlockButtonText: "!font-semibold !text-sm",
-    dividerLine: "!bg-white/10",
-    dividerText: "!text-zinc-600 !text-xs !uppercase !tracking-widest",
+    socialButtonsRoot: "!hidden",
+    socialButtonsBlockButton: "!hidden",
+    socialButtonsBlockButtonText: "!hidden",
+    dividerRow: "!hidden",
+    dividerLine: "!hidden",
+    dividerText: "!hidden",
+    badge: "!hidden",
     footerActionLink: "!text-amber-500 hover:!text-amber-400 !font-semibold",
     footerActionText: "!text-zinc-600",
     identityPreviewText: "!text-white",
@@ -44,8 +63,14 @@ const clerkAppearance = {
 };
 
 export default function SignUpPage() {
+  useHideClerkDevBadge();
   return (
     <div className="min-h-screen flex relative overflow-hidden bg-[#060606]">
+      <style>{`
+        .cl-badge, [class*="cl-badge"], [data-clerk-badge],
+        a[href*="clerk.com/docs/deployments"],
+        a[href*="dashboard.clerk.com"] { display: none !important; }
+      `}</style>
       {/* Left panel — branding */}
       <div className="hidden lg:flex w-1/2 flex-col items-center justify-center p-16 relative">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(245,158,11,0.12),transparent_60%)]" />

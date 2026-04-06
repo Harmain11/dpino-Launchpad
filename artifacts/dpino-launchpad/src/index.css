@@ -158,3 +158,16 @@
   backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
+
+/* Hide Clerk development mode badge globally */
+.cl-badge,
+[class*="cl-badge"],
+[data-clerk-badge],
+.cl-internal-badge,
+[class*="developerModeNotice"],
+[class*="developmentBadge"],
+[class*="cl-footer__badge"],
+[class*="cl-signIn-badge"],
+[class*="cl-signUp-badge"] {
+  display: none !important;
+}
