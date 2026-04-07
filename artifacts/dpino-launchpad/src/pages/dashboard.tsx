@@ -393,16 +393,12 @@ export default function Dashboard() {
               </div>
               <CardContent className="p-5 space-y-4">
                 <div className="flex items-center gap-3">
-                  {user?.imageUrl ? (
-                    <img src={user.imageUrl} className="w-12 h-12 rounded-full border border-primary/30" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-                      <p className="text-lg font-black text-primary">{displayName[0]?.toUpperCase()}</p>
-                    </div>
-                  )}
+                  <div className="w-12 h-12 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                    <p className="text-lg font-black text-primary">{displayName[0]?.toUpperCase()}</p>
+                  </div>
                   <div>
                     <p className="font-bold">{displayName}</p>
-                    <p className="text-xs text-muted-foreground">{user?.primaryEmailAddress?.emailAddress}</p>
+                    <p className="text-xs text-muted-foreground">Solana Wallet</p>
                   </div>
                 </div>
 
