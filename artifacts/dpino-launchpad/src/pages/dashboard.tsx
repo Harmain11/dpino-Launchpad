@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
-import { useUser } from "@clerk/react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
@@ -96,7 +95,6 @@ function TierBadge({ tier }: { tier: string }) {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function Dashboard() {
-  const { user } = useUser();
   const { publicKey, connected } = useWallet();
   const walletAddress = publicKey?.toBase58() ?? "";
 
@@ -121,7 +119,7 @@ export default function Dashboard() {
   const secondRate = posStaked * posApy / (365 * 24 * 3600);
 
   const multiplier = posTier === "DARK LORD" ? 7 : posTier === "GENERAL" ? 3 : 1;
-  const displayName = user?.firstName ?? user?.primaryEmailAddress?.emailAddress?.split("@")[0] ?? "Warrior";
+  const displayName = walletAddress ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}` : "Warrior";
 
   return (
     <div className="w-full min-h-screen py-10 relative overflow-hidden">

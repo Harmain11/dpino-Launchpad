@@ -19,18 +19,13 @@ Built as a pnpm workspace monorepo using TypeScript.
 ### API Field
 `totalRaisedDpino` (renamed from `totalRaisedUsd`) in `/api/stats/platform` response
 
-### Authentication & Routing (Clerk)
-Clerk auth is fully integrated with login-first flow. Routes: `/sign-in`, `/sign-up`.
-- Registration with email + password or Google OAuth
-- Email verification sent automatically on sign-up
-- Forgot password built into sign-in flow
-- **Protected routes**: `/dashboard`, `/projects`, `/projects/:id`, `/stake`, `/apply` all require sign-in (redirect to `/sign-in`)
-- **GuestRoute**: `/sign-in`, `/sign-up` redirect to `/dashboard` if already signed in
+### Authentication & Routing (Wallet-based)
+Authentication is wallet-connect based — no email/password. A connected Solana wallet = authenticated.
+- **Protected routes**: `/dashboard`, `/projects`, `/projects/:id`, `/stake`, `/apply` all require wallet connected (redirect to `/`)
 - **Home page** (`/`) remains fully public
 - **Admin** (`/admin`) remains public (security by obscurity)
-- Navbar: when signed out shows "SIGN IN" + "REGISTER" + only "Home"; when signed in shows Dashboard/Launchpad/Stake/Apply links + user dropdown with Dashboard link + Sign Out
-- Env secrets: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`
-- API: `@clerk/express` middleware on server; `@clerk/react` on client
+- Navbar: always shows all nav links; shows "Connect Wallet" button when disconnected; shows wallet address + $DPINO balance dropdown when connected
+- No Clerk dependency anywhere in the project
 
 ### User Dashboard (`/dashboard`)
 Full dashboard for authenticated users:
