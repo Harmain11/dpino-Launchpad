@@ -52,8 +52,8 @@ export function Navbar() {
   const { openConnectModal } = useWalletGate();
 
   const handleNavClick = (e: React.MouseEvent, link: { href: string; protected: boolean }) => {
+    e.preventDefault();
     if (link.protected && !connected) {
-      e.preventDefault();
       openConnectModal();
     } else {
       navigate(link.href);
