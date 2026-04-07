@@ -26,9 +26,9 @@ import { useDpinoPrice } from "@/hooks/useDpinoPrice";
 
 // ─── APY table ────────────────────────────────────────────────────────────────
 const APY: Record<string, Record<string, number>> = {
-  flexible: { SOLDIER: 0.12, GENERAL: 0.18, "DARK LORD": 0.24 },
-  fixed30:  { SOLDIER: 0.20, GENERAL: 0.28, "DARK LORD": 0.36 },
-  fixed90:  { SOLDIER: 0.30, GENERAL: 0.42, "DARK LORD": 0.54 },
+  flexible: { SOLDIER: 0.06, GENERAL: 0.09, "DARK LORD": 0.12 },
+  fixed30:  { SOLDIER: 0.10, GENERAL: 0.14, "DARK LORD": 0.18 },
+  fixed90:  { SOLDIER: 0.15, GENERAL: 0.20, "DARK LORD": 0.25 },
 };
 
 type StakeMode  = "flexible" | "fixed";

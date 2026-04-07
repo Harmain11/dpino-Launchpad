@@ -33,9 +33,9 @@ function fmtReward(n: number) {
 }
 
 const APY: Record<string, Record<string, number>> = {
-  flexible: { SOLDIER: 0.12, GENERAL: 0.18, "DARK LORD": 0.24 },
-  fixed30: { SOLDIER: 0.20, GENERAL: 0.28, "DARK LORD": 0.36 },
-  fixed90: { SOLDIER: 0.30, GENERAL: 0.42, "DARK LORD": 0.54 },
+  flexible: { SOLDIER: 0.06, GENERAL: 0.09, "DARK LORD": 0.12 },
+  fixed30:  { SOLDIER: 0.10, GENERAL: 0.14, "DARK LORD": 0.18 },
+  fixed90:  { SOLDIER: 0.15, GENERAL: 0.20, "DARK LORD": 0.25 },
 };
 
 function getPosApy(tier: string, type: string, days: number | null) {
@@ -452,9 +452,9 @@ export default function Dashboard() {
               </div>
               <CardContent className="p-5 space-y-3">
                 {[
-                  { name: "SOLDIER", min: "100K", mult: "1x", apy: "12%", icon: Shield, color: "text-amber-400" },
-                  { name: "GENERAL", min: "500K", mult: "3x", apy: "18%", icon: Zap, color: "text-violet-400" },
-                  { name: "DARK LORD", min: "1M", mult: "7x", apy: "24%", icon: Crown, color: "text-yellow-300" },
+                  { name: "SOLDIER", min: "100K", mult: "1x", apy: "6%", icon: Shield, color: "text-amber-400" },
+                  { name: "GENERAL", min: "500K", mult: "3x", apy: "9%", icon: Zap, color: "text-violet-400" },
+                  { name: "DARK LORD", min: "1M", mult: "7x", apy: "12%", icon: Crown, color: "text-yellow-300" },
                 ].map(({ name, min, mult, apy, icon: Icon, color }) => {
                   const isCurrentTier = posTier === name;
                   return (
