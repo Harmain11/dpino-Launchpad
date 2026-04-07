@@ -15,19 +15,19 @@ pub const GENERAL_THRESHOLD:   u64 = 500_000_000_000_000;   // 500K  DPINO
 pub const DARK_LORD_THRESHOLD: u64 = 1_000_000_000_000_000; // 1M    DPINO
 
 /// Flexible staking APYs (can withdraw after 7-day cooldown)
-pub const SOLDIER_FLEX_APY_BPS:   u64 = 1_200; // 12%
-pub const GENERAL_FLEX_APY_BPS:   u64 = 1_800; // 18%
-pub const DARK_LORD_FLEX_APY_BPS: u64 = 2_400; // 24%
+pub const SOLDIER_FLEX_APY_BPS:   u64 = 600;  //  6%
+pub const GENERAL_FLEX_APY_BPS:   u64 = 900;  //  9%
+pub const DARK_LORD_FLEX_APY_BPS: u64 = 1_200; // 12%
 
 /// Fixed 30-day staking APYs (tokens locked for 30 days, higher reward)
-pub const SOLDIER_FIXED30_APY_BPS:   u64 = 2_000; // 20%
-pub const GENERAL_FIXED30_APY_BPS:   u64 = 2_800; // 28%
-pub const DARK_LORD_FIXED30_APY_BPS: u64 = 3_600; // 36%
+pub const SOLDIER_FIXED30_APY_BPS:   u64 = 1_000; // 10%
+pub const GENERAL_FIXED30_APY_BPS:   u64 = 1_400; // 14%
+pub const DARK_LORD_FIXED30_APY_BPS: u64 = 1_800; // 18%
 
 /// Fixed 90-day staking APYs (tokens locked for 90 days, highest reward)
-pub const SOLDIER_FIXED90_APY_BPS:   u64 = 3_000; // 30%
-pub const GENERAL_FIXED90_APY_BPS:   u64 = 4_200; // 42%
-pub const DARK_LORD_FIXED90_APY_BPS: u64 = 5_400; // 54%
+pub const SOLDIER_FIXED90_APY_BPS:   u64 = 1_500; // 15%
+pub const GENERAL_FIXED90_APY_BPS:   u64 = 2_000; // 20%
+pub const DARK_LORD_FIXED90_APY_BPS: u64 = 2_500; // 25%
 
 pub const DEFAULT_COOLDOWN_SECONDS: i64 = 7 * 24 * 60 * 60;
 pub const RATE_DENOMINATOR:         u64 = 10_000;
@@ -111,7 +111,7 @@ pub mod dpino_staking {
         Ok(())
     }
 
-    /// Admin updates per-tier APY rates (in basis points).
+    /// Admin updates flexible-staking APY rates (basis points).
     pub fn update_apy_rates(
         ctx: Context<AdminOnly>,
         soldier_bps:   u64,
@@ -126,7 +126,49 @@ pub mod dpino_staking {
         pool.general_apy_bps   = general_bps;
         pool.dark_lord_apy_bps = dark_lord_bps;
         msg!(
-            "APYs updated: SOLDIER={}bps GENERAL={}bps DARK_LORD={}bps",
+            "Flex APYs updated: SOLDIER={}bps GENERAL={}bps DARK_LORD={}bps",
+            soldier_bps, general_bps, dark_lord_bps
+        );
+        Ok(())
+    }
+
+    /// Admin updates fixed-30-day APY rates (basis points).
+    pub fn update_fixed30_apy_rates(
+        ctx: Context<AdminOnly>,
+        soldier_bps:   u64,
+        general_bps:   u64,
+        dark_lord_bps: u64,
+    ) -> Result<()> {
+        require!(soldier_bps   <= 10_000, StakingError::InvalidRewardRate);
+        require!(general_bps   <= 10_000, StakingError::InvalidRewardRate);
+        require!(dark_lord_bps <= 10_000, StakingError::InvalidRewardRate);
+        let pool = &mut ctx.accounts.staking_pool;
+        pool.soldier_fixed30_apy_bps   = soldier_bps;
+        pool.general_fixed30_apy_bps   = general_bps;
+        pool.dark_lord_fixed30_apy_bps = dark_lord_bps;
+        msg!(
+            "Fixed-30d APYs updated: SOLDIER={}bps GENERAL={}bps DARK_LORD={}bps",
+            soldier_bps, general_bps, dark_lord_bps
+        );
+        Ok(())
+    }
+
+    /// Admin updates fixed-90-day APY rates (basis points).
+    pub fn update_fixed90_apy_rates(
+        ctx: Context<AdminOnly>,
+        soldier_bps:   u64,
+        general_bps:   u64,
+        dark_lord_bps: u64,
+    ) -> Result<()> {
+        require!(soldier_bps   <= 10_000, StakingError::InvalidRewardRate);
+        require!(general_bps   <= 10_000, StakingError::InvalidRewardRate);
+        require!(dark_lord_bps <= 10_000, StakingError::InvalidRewardRate);
+        let pool = &mut ctx.accounts.staking_pool;
+        pool.soldier_fixed90_apy_bps   = soldier_bps;
+        pool.general_fixed90_apy_bps   = general_bps;
+        pool.dark_lord_fixed90_apy_bps = dark_lord_bps;
+        msg!(
+            "Fixed-90d APYs updated: SOLDIER={}bps GENERAL={}bps DARK_LORD={}bps",
             soldier_bps, general_bps, dark_lord_bps
         );
         Ok(())
