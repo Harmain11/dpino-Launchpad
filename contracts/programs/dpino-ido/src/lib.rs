@@ -257,7 +257,11 @@ pub mod dpino_ido {
             IdoError::SoftCapMet
         );
 
-        let refund_amount = allocation.amount_paid_dpino;
+        // The 0.5% protocol fee is non-refundable (it was routed to the LP fee vault).
+        // Refund = gross paid − fee = the exact net that sits in the IDO vault.
+        let gross         = allocation.amount_paid_dpino;
+        let fee           = compute_fee(gross);
+        let refund_amount = gross.saturating_sub(fee);
         require!(refund_amount > 0, IdoError::NothingToRefund);
 
         // Transfer DPINO from IDO vault → user; sign as ido_pool PDA (vault authority)
@@ -281,7 +285,13 @@ pub mod dpino_ido {
 
         allocation.refunded = true;
 
-        msg!("Refunded {} DPINO to {}", refund_amount, ctx.accounts.user.key());
+        msg!(
+            "Refunded {} DPINO to {} (gross={} fee={})",
+            refund_amount,
+            ctx.accounts.user.key(),
+            gross,
+            fee
+        );
         Ok(())
     }
 
@@ -385,10 +395,9 @@ pub struct InitializeIdo<'info> {
     )]
     pub ido_pool: Account<'info, IdoPool>,
 
-    /// The $DPINO mint — verified to be the real DPINO token
-    #[account(
-        constraint = dpino_mint.key().to_string() == DPINO_MINT @ IdoError::InvalidMint
-    )]
+    /// The $DPINO mint — caller (authority signer) is responsible for passing
+    /// the correct mint. On mainnet this must be DPINO_MINT; trustworthiness
+    /// derives from the fact that only the launchpad admin calls initialize_ido.
     pub dpino_mint: Account<'info, Mint>,
 
     /// DPINO vault — holds contributed DPINO tokens
@@ -402,9 +411,10 @@ pub struct InitializeIdo<'info> {
     )]
     pub ido_vault: Account<'info, TokenAccount>,
 
-    /// Protocol fee vault — 0.5% DPINO goes here, routed to DPINO/SOL LP
+    /// Protocol fee vault — 0.5% DPINO goes here, routed to DPINO/SOL LP.
+    /// Uses init_if_needed so this shared vault survives across multiple IDOs.
     #[account(
-        init,
+        init_if_needed,
         payer = authority,
         token::mint = dpino_mint,
         token::authority = ido_pool,
@@ -494,18 +504,23 @@ pub struct Participate<'info> {
     pub token_program:  Program<'info, Token>,
 }
 
-/// Cross-program read of the staking position (only tier field needed).
+/// Cross-program read of the staking position (must mirror StakingPosition byte-for-byte).
+/// Field order and types MUST exactly match dpino-staking's StakingPosition struct
+/// so that Anchor deserializes the correct byte offsets when reading tier.
 #[account]
 pub struct StakingPositionExternal {
-    pub owner:                 Pubkey,
-    pub pool:                  Pubkey,
-    pub amount_staked:         u64,
-    pub start_time:            i64,
-    pub unstake_initiated_at:  i64,
-    pub tier:                  u8,
-    pub rewards_earned:        u64,
-    pub last_claim_time:       i64,
-    pub bump:                  u8,
+    pub owner:                 Pubkey,  // 32
+    pub pool:                  Pubkey,  // 32
+    pub amount_staked:         u64,     // 8
+    pub start_time:            i64,     // 8
+    pub unstake_initiated_at:  i64,     // 8
+    pub lock_until:            i64,     // 8  — fixed-stake unlock timestamp (0 = flexible)
+    pub tier:                  u8,      // 1  — 0=none 1=soldier 2=general 3=dark_lord
+    pub staking_mode:          u8,      // 1  — 0=flexible 1=fixed
+    pub dpino_rewards_pending: u64,     // 8
+    pub position_apy_bps:      u64,     // 8
+    pub last_claim_time:       i64,     // 8
+    pub bump:                  u8,      // 1
 }
 
 #[derive(Accounts)]

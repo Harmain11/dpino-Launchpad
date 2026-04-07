@@ -168,7 +168,7 @@ async function main() {
 
   await program.methods
     .initializePool(new anchor.BN(COOLDOWN_SECONDS))
-    .accounts({ authority: provider.wallet.publicKey, dpino_mint: DPINO_MINT })
+    .accounts({ authority: provider.wallet.publicKey, dpinoMint: DPINO_MINT })
     .rpc();
 
   console.log("Pool PDA:", poolPda.toBase58());
@@ -355,12 +355,13 @@ the program directly from the user's wallet.
 
 | Instruction | What it does |
 |-------------|-------------|
-| `initialize_ido` | Creates IDO pool + vault |
-| `participate` | User sends SOL/DPINO, gets allocation |
-| `finalize_ido` | Authority finalizes when soft cap hit |
-| `claim_tokens` | User claims project tokens post-IDO |
-| `refund` | User refunds if soft cap not met |
-| `emergency_close` | Authority cancels + refunds all |
+| `initialize_ido(params)` | Admin creates IDO pool + vaults |
+| `participate(amount)` | User sends DPINO, gets allocation (0.5% fee deducted) |
+| `finalize_ido()` | Admin finalizes after end time |
+| `set_token_mint()` | Admin sets project token mint after TGE |
+| `claim_tokens()` | User claims project tokens post-IDO |
+| `refund()` | User refunds net DPINO if soft cap not met (protocol fee non-refundable) |
+| `withdraw_funds()` | Admin withdraws raised DPINO to Raydium LP |
 
 ---
 
