@@ -8,13 +8,16 @@ Two Anchor programs live in `contracts/programs/`:
 
 | Program | Description |
 |---------|-------------|
-| `dpino-staking` | Stake $DPINO → earn $DPINO rewards (12/18/24% APY by tier) + proportional SOL fees |
+| `dpino-staking` | Stake $DPINO → earn $DPINO rewards (6–25% APY by tier/mode) + proportional SOL fees |
 | `dpino-ido`     | Tier-gated IDO participation, allocation tracking, 0.5% protocol fee collection |
 
 **Reward flow:**
-1. Users stake $DPINO into the staking vault.
+1. Users stake $DPINO into the staking vault (flexible or fixed 30/90-day lock).
 2. Every IDO charges a 0.5% DPINO fee → admin sweeps it into the reward vault.
-3. Stakers accrue APY rewards every second (SOLDIER 12%, GENERAL 18%, DARK LORD 24%).
+3. Stakers accrue APY rewards every second — rates by tier and mode:
+   - **Flexible**: SOLDIER 6% · GENERAL 9% · DARK LORD 12%
+   - **Fixed-30d**: SOLDIER 10% · GENERAL 14% · DARK LORD 18%
+   - **Fixed-90d**: SOLDIER 15% · GENERAL 20% · DARK LORD 25%
 4. Users also earn a proportional share of SOL fees the admin deposits.
 5. Users call `claim_dpino_rewards` or `claim_sol_rewards` at any time — no lockup on rewards.
 
@@ -169,7 +172,8 @@ async function main() {
     .rpc();
 
   console.log("Pool PDA:", poolPda.toBase58());
-  console.log("Initialized. APYs: SOLDIER=12% GENERAL=18% DARK_LORD=24%");
+  console.log("Initialized. Flex APYs: SOLDIER=6% GENERAL=9% DARK_LORD=12%");
+  console.log("Fixed-30d APYs: 10%/14%/18% | Fixed-90d APYs: 15%/20%/25%");
 }
 main();
 ```
@@ -213,7 +217,7 @@ main();
 ```
 
 > Rule of thumb: Keep 3–6 months of expected rewards in the vault at all times.
-> At 100M DPINO staked at 18% avg APY → ~18M / year → deposit ~5M per quarter.
+> At 100M DPINO staked at ~12% avg APY (mix of tiers/modes) → ~12M / year → deposit ~3M per quarter.
 
 ---
 
@@ -257,10 +261,11 @@ anchor test --provider.cluster devnet
 ```
 
 Tests verify:
-- Pool initializes with correct 12/18/24% APYs
-- `stake(100,000)` creates SOLDIER position
-- After 1 minute, `claim_dpino_rewards` returns correct APY fraction
-- `initiate_unstake` → 7-day wait → `complete_unstake` returns full amount
+- Pool initializes with correct APYs (Flex 6/9/12%, Fixed-30d 10/14/18%, Fixed-90d 15/20/25%)
+- `stake(100,000)` creates SOLDIER position at 600 bps (6%)
+- `stakeFixed(100,000, 30)` creates SOLDIER fixed-30d position at 1000 bps (10%)
+- `updateApyRates`, `updateFixed30ApyRates`, `updateFixed90ApyRates` all work
+- `initiate_unstake` → cooldown → `complete_unstake` returns full amount
 - `fund_sol_rewards` + `claim_sol_rewards` splits proportionally
 
 ---
@@ -333,15 +338,18 @@ the program directly from the user's wallet.
 
 | Instruction | Who | What it does |
 |-------------|-----|-------------|
-| `initialize_pool(cooldown)` | Admin (once) | Creates pool PDA, sets 12/18/24% APYs |
-| `stake(amount)` | User | Locks DPINO, sets tier, starts earning |
+| `initialize_pool(cooldown)` | Admin (once) | Creates pool PDA, sets all APY defaults |
+| `stake(amount)` | User | Flexible stake — locks DPINO, sets tier, starts earning |
+| `stake_fixed(amount, days)` | User | Fixed stake (30 or 90 days) — higher APY, no early withdrawal |
 | `initiate_unstake()` | User | Starts 7-day cooldown, snapshots rewards |
 | `complete_unstake()` | User | Returns DPINO after cooldown elapses |
 | `claim_dpino_rewards()` | User | Sends accrued DPINO from vault to user |
 | `claim_sol_rewards()` | User | Sends proportional SOL from pool to user |
 | `fund_reward_vault(amount)` | Admin | Deposits DPINO into reward vault |
 | `fund_sol_rewards(lamports)` | Admin | Deposits SOL into reward pool |
-| `update_apy_rates(s,g,d)` | Admin | Adjusts per-tier APY rates |
+| `update_apy_rates(s,g,d)` | Admin | Adjusts flexible APY rates (bps) |
+| `update_fixed30_apy_rates(s,g,d)` | Admin | Adjusts fixed-30d APY rates (bps) |
+| `update_fixed90_apy_rates(s,g,d)` | Admin | Adjusts fixed-90d APY rates (bps) |
 
 ### dpino-ido
 
@@ -390,9 +398,9 @@ the program directly from the user's wallet.
 | GENERAL threshold | 500,000 DPINO = `500_000_000_000_000` raw |
 | DARK LORD threshold | 1,000,000 DPINO = `1_000_000_000_000_000` raw |
 | Unstake cooldown | 604,800 seconds (7 days) |
-| SOLDIER APY | 12% (1,200 bps) |
-| GENERAL APY | 18% (1,800 bps) |
-| DARK LORD APY | 24% (2,400 bps) |
+| Flexible APYs | SOLDIER 6% (600 bps) · GENERAL 9% (900 bps) · DARK LORD 12% (1,200 bps) |
+| Fixed-30d APYs | SOLDIER 10% (1,000 bps) · GENERAL 14% (1,400 bps) · DARK LORD 18% (1,800 bps) |
+| Fixed-90d APYs | SOLDIER 15% (1,500 bps) · GENERAL 20% (2,000 bps) · DARK LORD 25% (2,500 bps) |
 
 ---
 

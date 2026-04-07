@@ -307,9 +307,9 @@ pub mod dpino_staking {
         let elapsed = now.saturating_sub(pos.unstake_initiated_at);
         require!(elapsed >= pool.cooldown_seconds, StakingError::CooldownNotElapsed);
 
-        let amount   = pos.amount_staked;
-        let pool_key = pool.key();
-        let seeds: &[&[&[u8]]] = &[&[b"staking_pool", pool_key.as_ref(), &[pool.bump]]];
+        let amount        = pos.amount_staked;
+        let dpino_mint    = pool.dpino_mint;
+        let seeds: &[&[&[u8]]] = &[&[b"staking_pool", dpino_mint.as_ref(), &[pool.bump]]];
 
         let cpi_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -353,8 +353,8 @@ pub mod dpino_staking {
             StakingError::InsufficientRewardVault
         );
 
-        let pool_key = pool.key();
-        let seeds: &[&[&[u8]]] = &[&[b"staking_pool", pool_key.as_ref(), &[pool.bump]]];
+        let dpino_mint = pool.dpino_mint;
+        let seeds: &[&[&[u8]]] = &[&[b"staking_pool", dpino_mint.as_ref(), &[pool.bump]]];
 
         let cpi_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -704,17 +704,17 @@ pub struct StakingPool {
     pub reward_vault:              Pubkey,  // 32
     pub total_staked:              u64,     // 8
     // Flexible APYs
-    pub soldier_apy_bps:           u64,     // 8   12%
-    pub general_apy_bps:           u64,     // 8   18%
-    pub dark_lord_apy_bps:         u64,     // 8   24%
+    pub soldier_apy_bps:           u64,     // 8    6%
+    pub general_apy_bps:           u64,     // 8    9%
+    pub dark_lord_apy_bps:         u64,     // 8   12%
     // Fixed 30-day APYs
-    pub soldier_fixed30_apy_bps:   u64,     // 8   20%
-    pub general_fixed30_apy_bps:   u64,     // 8   28%
-    pub dark_lord_fixed30_apy_bps: u64,     // 8   36%
+    pub soldier_fixed30_apy_bps:   u64,     // 8   10%
+    pub general_fixed30_apy_bps:   u64,     // 8   14%
+    pub dark_lord_fixed30_apy_bps: u64,     // 8   18%
     // Fixed 90-day APYs
-    pub soldier_fixed90_apy_bps:   u64,     // 8   30%
-    pub general_fixed90_apy_bps:   u64,     // 8   42%
-    pub dark_lord_fixed90_apy_bps: u64,     // 8   54%
+    pub soldier_fixed90_apy_bps:   u64,     // 8   15%
+    pub general_fixed90_apy_bps:   u64,     // 8   20%
+    pub dark_lord_fixed90_apy_bps: u64,     // 8   25%
     pub sol_reward_lamports:       u64,     // 8
     pub cooldown_seconds:          i64,     // 8
     pub bump:                      u8,      // 1

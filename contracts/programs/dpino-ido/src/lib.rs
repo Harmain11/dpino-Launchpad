@@ -260,12 +260,12 @@ pub mod dpino_ido {
         let refund_amount = allocation.amount_paid_dpino;
         require!(refund_amount > 0, IdoError::NothingToRefund);
 
-        // Transfer DPINO from IDO vault → user via PDA signer
+        // Transfer DPINO from IDO vault → user; sign as ido_pool PDA (vault authority)
         let project_name_bytes = ido.project_name.as_bytes().to_vec();
         let signer_seeds: &[&[&[u8]]] = &[&[
-            b"ido_vault",
+            b"ido_pool",
             project_name_bytes.as_ref(),
-            &[ctx.bumps.ido_vault],
+            &[ido.bump],
         ]];
 
         let cpi_ctx = CpiContext::new_with_signer(
@@ -273,7 +273,7 @@ pub mod dpino_ido {
             Transfer {
                 from:      ctx.accounts.ido_vault.to_account_info(),
                 to:        ctx.accounts.user_dpino_ata.to_account_info(),
-                authority: ctx.accounts.ido_vault.to_account_info(),
+                authority: ctx.accounts.ido_pool.to_account_info(),
             },
             signer_seeds,
         );
@@ -299,12 +299,12 @@ pub mod dpino_ido {
 
         let vault_balance = ctx.accounts.ido_vault.amount;
 
-        // Transfer all DPINO from vault → authority (admin routes to Raydium LP)
+        // Transfer all DPINO from vault → authority; sign as ido_pool PDA (vault authority)
         let project_name_bytes = ido.project_name.as_bytes().to_vec();
         let signer_seeds: &[&[&[u8]]] = &[&[
-            b"ido_vault",
+            b"ido_pool",
             project_name_bytes.as_ref(),
-            &[ctx.bumps.ido_vault],
+            &[ido.bump],
         ]];
 
         let cpi_ctx = CpiContext::new_with_signer(
@@ -312,7 +312,7 @@ pub mod dpino_ido {
             Transfer {
                 from:      ctx.accounts.ido_vault.to_account_info(),
                 to:        ctx.accounts.authority_dpino_ata.to_account_info(),
-                authority: ctx.accounts.ido_vault.to_account_info(),
+                authority: ctx.accounts.ido_pool.to_account_info(),
             },
             signer_seeds,
         );
