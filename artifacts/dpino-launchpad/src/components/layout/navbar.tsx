@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useLocation as useNav } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Menu, X, ChevronDown, Copy, LogOut, Wallet } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useDpinoBalance } from "@/hooks/useDpinoBalance";
 import { useDpinoPrice } from "@/hooks/useDpinoPrice";
+import { useWalletGate, PROTECTED_PATHS } from "@/context/WalletGateContext";
 
 function shortenAddress(addr: string) {
   return `${addr.slice(0, 4)}...${addr.slice(-4)}`;
@@ -33,21 +34,33 @@ const WALLET_OPTIONS = [
 ];
 
 const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/projects", label: "Launchpad" },
-  { href: "/stake", label: "Stake" },
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/apply", label: "Apply" },
+  { href: "/", label: "Home", protected: false },
+  { href: "/projects", label: "Launchpad", protected: true },
+  { href: "/stake", label: "Stake", protected: true },
+  { href: "/dashboard", label: "Dashboard", protected: true },
+  { href: "/apply", label: "Apply", protected: true },
 ];
 
 export function Navbar() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const { select, wallets, publicKey, connected, disconnect, connecting } = useWallet();
+  const { openConnectModal } = useWalletGate();
+
+  const handleNavClick = (e: React.MouseEvent, link: { href: string; protected: boolean }) => {
+    if (link.protected && !connected) {
+      e.preventDefault();
+      openConnectModal();
+    } else {
+      navigate(link.href);
+      setMobileMenuOpen(false);
+    }
+  };
+
   const { data: balance } = useDpinoBalance();
   const { data: priceData } = useDpinoPrice();
 
@@ -118,15 +131,16 @@ export function Navbar() {
 
           <div className="hidden md:flex items-center gap-8">
             {NAV_LINKS.map((link) => (
-              <Link
+              <a
                 key={link.href}
                 href={link.href}
-                className={`text-sm font-medium tracking-wide uppercase transition-colors hover:text-primary ${
+                onClick={(e) => handleNavClick(e, link)}
+                className={`text-sm font-medium tracking-wide uppercase transition-colors hover:text-primary cursor-pointer ${
                   location === link.href ? "text-primary" : "text-muted-foreground"
                 }`}
               >
                 {link.label}
-              </Link>
+              </a>
             ))}
           </div>
 
@@ -227,16 +241,16 @@ export function Navbar() {
         {mobileMenuOpen && (
           <div className="md:hidden border-b border-white/10 bg-background/95 backdrop-blur-xl absolute top-full left-0 w-full p-4 flex flex-col gap-4">
             {NAV_LINKS.map((link) => (
-              <Link
+              <a
                 key={link.href}
                 href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`text-base font-medium tracking-wide uppercase p-2 border-b border-white/5 transition-colors ${
+                onClick={(e) => handleNavClick(e, link)}
+                className={`text-base font-medium tracking-wide uppercase p-2 border-b border-white/5 transition-colors cursor-pointer ${
                   location === link.href ? "text-primary" : "text-muted-foreground"
                 }`}
               >
                 {link.label}
-              </Link>
+              </a>
             ))}
 
             {connected && publicKey ? (
