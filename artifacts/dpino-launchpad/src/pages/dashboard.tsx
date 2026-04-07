@@ -429,10 +429,10 @@ export default function Dashboard() {
               </div>
               <CardContent className="p-5 space-y-3">
                 {[
-                  { label: "Total Staked", value: stats ? fmt(stats.totalStaked) + " DPINO" : "—", icon: Lock },
-                  { label: "Active Stakers", value: stats ? stats.stakerCount.toLocaleString() : "—", icon: Users },
+                  { label: "Total Staked", value: stats ? fmt(stats.totalDpinoStaked) + " DPINO" : "—", icon: Lock },
+                  { label: "Active Stakers", value: stats ? stats.totalStakers.toLocaleString() : "—", icon: Users },
                   { label: "Active Launches", value: stats ? String(stats.activeLaunches) : "—", icon: Activity },
-                  { label: "DPINO Raised", value: stats ? fmt(stats.totalRaised) : "—", icon: BarChart3 },
+                  { label: "DPINO Raised", value: stats ? fmt(stats.totalRaisedDpino) : "—", icon: BarChart3 },
                 ].map(({ label, value, icon: Icon }) => (
                   <div key={label} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
                     <div className="flex items-center gap-2">
